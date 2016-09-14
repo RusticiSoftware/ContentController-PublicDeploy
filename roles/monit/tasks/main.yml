@@ -1,0 +1,14 @@
+---
+
+  - name: Install monit
+    package: name=monit state=latest update_cache=no
+
+  - name: delete old cronjob method of running healthcheck
+    cron: name="check cc process" minute=* job="/usr/local/bin/cc-healthcheck.py 2>&1 /dev/null" state=absent
+
+  - name: Install Service Layer healthcheck script
+    template: src=cc-healthcheck.py.j2 dest=/usr/local/bin/cc-healthcheck.py mode=0750 owner=root group=root
+
+  - name: Install Service Layer healthcheck script daemonizer
+    template: src=cc-healthcheck.init.j2 dest=/etc/init.d/cchealthcheck mode=0755 owner=root group=root
+    notify: restart cchealthcheck

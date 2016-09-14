@@ -1,0 +1,17 @@
+---
+
+# These are post-install cleanup tasks
+# that should only be run after all the other
+# playbooks have completed themselves
+
+  - name: reset rights on contentcontroller MySQL users
+    mysql_user: name="{{ cc_db_username }}" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} password="{{ cc_db_password }}" priv={{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE state=present
+
+  - name: reset rights on contentcontroller MySQL users
+    mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} password="{{ cc_db_password }}" priv={{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE state=present
+
+  - name: reset rights on ScormEngine MySQL users
+    mysql_user: name="{{ engine_db_username }}" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} password="{{ engine_db_password }}" priv={{ engine_db_name }}.*:SELECT,INSERT,UPDATE,DELETE state=present
+
+  - name: reset rights on ScormEngine MySQL users
+    mysql_user: name="{{ engine_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} password="{{ engine_db_password }}" priv={{ engine_db_name }}.*:SELECT,INSERT,UPDATE,DELETE state=present

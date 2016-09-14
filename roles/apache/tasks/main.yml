@@ -1,0 +1,79 @@
+---
+
+  - name: update apt cache
+    apt: update_cache=yes  cache_valid_time=86400
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install apache packages (Ubuntu)
+    package: name={{ item }} state=present
+    with_items:
+      - apache2
+      - libapache2-mod-jk
+      - libapache2-mod-python
+#      - libapache2-mod-wsgi
+      - libapache2-mod-authnz-external
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install apache packages (RedHat)
+    package: name={{ item }} state=present
+    with_items:
+      - httpd
+      - libapache2-mod-jk
+      - libapache2-mod-python
+    notify: restart httpd
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Remove default config files.
+    shell: rm -f /etc/apache2/sites-enabled/*
+    ignore_errors: yes
+
+  - name: Install config files - apache2.conf
+    action: template src=apache2-v2.conf.j2 dest=/etc/apache2/apache2.conf
+    notify: restart httpd
+
+  - name: Install config files - default
+    action: template src=000-default.j2 dest=/etc/apache2/sites-enabled/000-default.conf
+    notify: restart httpd
+
+  - name: Install config files - SSL
+    action: template src=contentcontroller.conf.j2 dest=/etc/apache2/sites-enabled/000-default-ssl.conf
+    notify: restart httpd
+    when: use_ssl
+
+  - name: Install config files - max_clients
+    action: template src=max_clients.conf dest=/etc/apache2/conf-enabled/max_clients.conf
+    notify: restart httpd
+
+  - name: Install config files - security
+    action: template src=security.conf dest=/etc/apache2/conf-enabled/security.conf
+    notify: restart httpd
+
+  - name: Install config files - ssl.conf
+    action: template src=ssl-v2.conf.j2 dest=/etc/apache2/mods-available/ssl.conf
+    notify: restart httpd
+    when: use_ssl
+
+  - name: Install config files - ports.conf
+    action: template src=ports.conf dest=/etc/apache2/ports.conf
+    notify: restart httpd
+
+  - name: Install config files - jk.conf
+    action: template src=jk.conf dest=/etc/apache2/mods-available/jk.conf
+    notify: restart httpd
+
+  - name: Install mod_jk workers.properties
+    action: template src=workers.properties dest=/etc/libapache2-mod-jk/workers.properties
+    notify: restart httpd
+
+  - name: Disable mpm_event
+    action: command a2dismod mpm_event
+    notify: restart httpd
+
+  - name: Enable required modules
+    action: command a2enmod rewrite ssl authnz_external proxy proxy_http headers jk python mpm_prefork expires
+    notify: restart httpd
+
+  - name: Install Logrotate file
+    action: template src=apache2.logrotate dest=/etc/logrotate.d/apache.logrotate
+

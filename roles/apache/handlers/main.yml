@@ -1,0 +1,9 @@
+---
+
+  - name: restart httpd
+    service: name=apache2 state=restarted
+
+  - name: start httpd
+    action: service name=apache2 state=started
+
+
