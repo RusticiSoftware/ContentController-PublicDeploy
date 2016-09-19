@@ -12,8 +12,7 @@
     - java
     - { role: mysql-local, when: cc_db_host == "localhost" }
     - { role: mysql-config, when: initialize_mysql }
-    - { role: apache, when: ansible_distribution == 'Ubuntu' }
-    - { role: nginx, when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'}
+    - role: apache
     - { role: cloudfront, when: use_cloudfront}
     - content-controller
     - cc-scorm-engine
