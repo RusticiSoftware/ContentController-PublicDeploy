@@ -1,0 +1,91 @@
+---
+
+  - name: Fetch Mysql deb installer
+    get_url: url="http://dev.mysql.com/get/mysql-apt-config_0.3.5-1ubuntu14.04_all.deb" dest="/tmp/mysql-apt-config_0.3.5-1ubuntu14.04_all.deb" mode=0750
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Deploy MySQL Apt repo script
+    template: src=install-mysql-repo.sh.j2 dest=/usr/local/bin/install-mysql-repo.sh mode=0750
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install Mysql Apt repo
+    shell: /usr/local/bin/install-mysql-repo.sh >> /tmp/mysql-apt-install.log
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: update apt cache now that the mysql repo is installed
+    apt: update_cache=yes
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install server and client with dependecies
+    apt: name={{ item }} state=present dpkg_options='force-confold,force-confdef'
+    with_items:
+      - "mysql-server-5.6"
+    notify: restart mysql
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Copy over MySQL 5.6 Repo (RedHat)
+    copy:
+      src: mysql-community-release-el7-5.noarch.rpm
+      dest: /tmp/mysql-community-release-el7-5.noarch.rpm
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install MySQL 5.6 repo (RedHat)
+    yum:
+      name: /tmp/mysql-community-release-el7-5.noarch.rpm
+      state: present
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install MySQL server 5.6 (RedHat)
+    yum:
+      name: mysql-community-server
+      state: latest
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: install other packages (Ubuntu)
+    package: name={{ item }} state=present
+    with_items:
+      - python-mysqldb
+      - libmysql-java
+      - mysql-utilities
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install other packages (RedHat)
+    package: name={{ item }} state=present
+    with_items:
+      - mysql-connector-java
+      - MySQL-python
+      - mysql-utilities
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name:  Bind MySQL server to all interfaces on dev boxen only
+    lineinfile: dest=/etc/mysql/my.cnf regexp="^bind-address" line='bind-address = 0.0.0.0'
+    when: env == "dev" and ansible_distribution == 'Ubuntu'
+    notify: restart mysql
+
+  - name: Start Mysql server
+    service: name=mysql state=started
+   
+  - name: Create /etc/mysql directory if it doesn't exist
+    file:
+        path: /etc/mysql
+        state: directory
+        mode: 0755
+        owner: root
+        group: root
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  # http://legalhackers.com/advisories/MySQL-Exploit-Remote-Root-Code-Execution-Privesc-CVE-2016-6662.html
+  - name: Set permissions on master config files or spawn them to mitigate CVE-2016-6662
+    file: 
+      path: "{{ item }}"
+      state: touch
+      mode: 0644
+      owner: root
+      group: root
+    with_items:
+      - /etc/mysql/my.cnf
+      - /etc/my.cnf
+      - /var/lib/mysql/.my.cnf
+      - /var/lib/mysql/my.cnf
+    ignore_errors: true
+

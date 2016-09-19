@@ -1,0 +1,31 @@
+---
+
+  - name: Apt | install qa-specific packages
+    apt: name={{ item }} state=latest
+    with_items:
+        - mono-devel
+        - mono-gmcs
+        - ant
+        #- mysql-client-core-5.6
+        #- memcached
+
+  - name: install nodejs and npm ppa
+    apt_repository: repo='ppa:chris-lea/node.js'
+
+  - name: Apt | install nodejs-specific packages
+    apt: name={{ item }} state=latest update_cache=yes
+    with_items:
+        - nodejs
+
+  - name: install grunt-cli
+    npm: name=grunt-cli global=yes
+
+  - name: Vagrant | Disable puppet-agent to remove log noise on dev
+    service: name=puppet state=stopped
+    when: env == "dev" or env == "qa"
+    ignore_errors: yes
+
+  - name: Vagrant | Disable chef-client to remove log noise on dev
+    service: name=chef-client state=stopped
+    when: env == "dev" or env == "qa"
+    ignore_errors: yes

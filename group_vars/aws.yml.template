@@ -1,0 +1,28 @@
+---
+
+# These vars only need to be set if you're using the build_ami.yml playbook to create your own AMIs
+# Or if you're building CloudFormation stuff
+# In all likelihood, you can just ignore all of these settings.
+
+aws_az: 
+aws_access_key: 
+aws_secret_key: 
+
+vpc_subnet: "10.1.0.0/16"
+vpc_public_subnet: "10.1.1.0/24"
+vpc_private_subnet: "10.2.101.0/24"
+
+# AMI Builder vars - for building Content Controller AMIs via the build-ami playbook
+ami_build_vpc_subnet_id: 
+ami_build_security_group_id: 
+availability_zone: 
+
+# Elastic Load Balancer
+instance_size: m3.medium
+
+ssh_key: 
+
+elb_SSLCertificateId: ''
+
+# Default, which is just a boilerplate ubuntu 14.04 box.
+webami: ami-fce3c696

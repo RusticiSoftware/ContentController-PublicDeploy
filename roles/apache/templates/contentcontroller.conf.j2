@@ -1,0 +1,109 @@
+<VirtualHost *:443>
+
+    ServerName {{ ServerName }}
+	ServerAdmin {{ ServerAdmin }}
+	ServerSignature Off
+    Options -Indexes
+
+    SSLEngine on
+    SSLProxyEngine On
+    SSLCertificateFile /etc/ssl/certs/{{ ssl_certificate }}
+    SSLCertificateKeyFile /etc/ssl/private/{{ ssl_key }}
+
+    {% if not use_self_signed %}
+    SSLCertificateChainFile /etc/ssl/certs/{{ ssl_chain }}
+    {% endif %}
+    
+    Header set X-XSS-Protection: "1; mode=block"
+
+    # IE won't let us set cookies without this.
+    Header set P3P 'CP="NOI"'
+
+    RewriteEngine on
+
+    #Block access to .git directories
+    RewriteRule ^(.*\/)?\.git - [R=404,L]
+
+    RewriteRule \.ini$ - [R=404,L]
+
+    ##Set max header size to 16Kb
+    ##raise limit to 16Kb to support large cookies created by lectora courses
+    LimitRequestFieldSize 16384
+     
+    JkMount /ScormEngineInterface/* ajp13_worker
+
+    ProxyPass /api/ http://localhost:8989/api/
+    ProxyPassReverse /api http://localhost:8989/api/
+
+    <Location "/api/">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        #RequestHeader set  X-Apache-Proxy true
+        #RequestHeader set  Host             "%{HTTP_HOST}"
+        #RequestHeader set  X-Real-IP        "%{REMOTE_ADDR}"
+        RequestHeader set  X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+
+    ProxyPass /ops http://localhost:8981/ops
+    ProxyPassReverse /api http://localhost:8981/ops
+
+    <Location "/ops">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        #RequestHeader set  X-Apache-Proxy true
+        #RequestHeader set  Host             "%{HTTP_HOST}"
+        #RequestHeader set  X-Real-IP        "%{REMOTE_ADDR}"
+        RequestHeader set  X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+
+    ProxyPass /healthcheck http://localhost:8981/healthcheck
+    ProxyPassReverse /healthcheck http://localhost:8981/healthcheck
+
+    <Location "/healthcheck">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        RequestHeader set  X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+
+
+    DocumentRoot {{ html_path }}
+
+    <Directory {{ html_path }}>
+		Options FollowSymLinks MultiViews
+		AllowOverride None
+		Order allow,deny
+		allow from all
+
+        <FilesMatch "\.(htm|html)$">
+            ExpiresActive On
+            ExpiresDefault A1
+            Header append Cache-Control must-revalidate
+        </FilesMatch>
+        
+	</Directory>
+
+    ErrorLog /var/log/apache2/error.log
+
+    # Possible values include: debug, info, notice, warn, error, crit,
+	# alert, emerg.
+	LogLevel warn
+
+	SetEnvIf REMOTE_ADDR "(.+)" CLIENTIP=$1
+	SetEnvIf X-Forwarded-For "^([0-9.]+)" CLIENTIP=$1
+	LogFormat "%{CLIENTIP}e %l %u %t %D \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" trueip_combined
+
+	CustomLog /var/log/apache2/ssl_access.log trueip_combined
+
+</VirtualHost>

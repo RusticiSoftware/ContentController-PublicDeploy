@@ -1,0 +1,43 @@
+---
+
+cc_deploy_path: "/var/lib/contentcontroller"
+
+CC_API_PORT: 8989
+CC_ADMIN_PORT: 8981
+
+cc_db_username: ccontroller
+cc_db_name: contentcontroller
+cc_db_url: "jdbc:mysql://{{ cc_db_host }}:3306/{{ cc_db_name }}"
+
+# When the static assets go:
+
+# Apache Settings (with trailing slash, please)
+html_path: "/var/www/html/"
+
+# The expiration time for auth tokens in minutes. The minimum value is 1
+# minute, the maximum value is 43200 minutes (30 days), and the default
+# is 1440 minutes (1 day).
+token_exp: 1440
+
+# The maximum number of times a user can attempt to log in before their
+# account is locked.
+maxLoginAttempts: 3
+
+# How long should dispatch download links be available before expiring, in minutes.
+# The minimum value is 1 minute, and the maximum value is 720000 minutes (500 days).
+defaultDownloadExpiration: 14400
+
+# An identifier for the application that is added to authentication tokens.
+# The default is "ContentController", it can be any arbitrary string or
+# (ideally) a URL. Changing this value will invalidate existing tokens,
+# requiring users to re-authenticate.
+issuer: ContentController
+
+# A temp directory where we can stage stuff during installation
+temp_path: /tmp/contentcontroller-snapshot
+
+# The hostname at which the service layer itself is hosted. Typically, this will be localhost.
+# This setting is used when importing content, but is not persisted
+# anywhere - so it may be changed without causing any issues.
+serviceHost: localhost
+
