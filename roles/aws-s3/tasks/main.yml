@@ -1,0 +1,170 @@
+---
+
+# Note that this playbook REQUIRES that you use your own AWS Environment vars/boto config
+# It's not going to use any of the vars set in the playbooks or ansible environment vars
+
+  - name: create AWS S3 Bucket
+    s3_bucket:
+       name: "{{ S3FileStoragePrefix }}-cc-content"
+       state: present
+       versioning: yes
+       tags:
+        domain: "{{ ServerName }}"
+        application: "ContentController"
+        environment: "{{ env }}"
+    register: bucket
+    when: not Slartibartfast
+
+  - name: create AWS S3 log Bucket
+    s3_bucket:
+       name: "{{ S3FileStoragePrefix }}-cc-content-logs"
+       state: present
+       versioning: yes
+       tags:
+        domain: "{{ ServerName }}"
+        application: "ContentController"
+        environment: "{{ env }}"
+    register: logbucket
+    when: not Slartibartfast
+
+  - debug: var=bucket
+
+  - name: Create IAM group
+    iam:
+      iam_type: group
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "{{ ClientName }}ContentControllerS3Users"
+    register: iamgroups
+    when: not Slartibartfast
+
+  - debug: var=iamgroups
+
+  - name: Create a new IAM user with API keys
+    iam:
+      iam_type: user
+      name: "{{ item }}"
+      state: present
+      groups: "{{ ClientName }}ContentControllerS3Users"
+      access_key_state: create
+    with_items:
+      - "{{ S3FileStorageIAMUsernamePrompt }}"
+    register: user
+    when: not Slartibartfast
+
+  - debug: var=user
+
+  - set_fact: 
+      S3FileStorageAwsId: "{{ user.results[0].user_meta.access_keys[0].access_key_id }}"
+    when: user.results[0].changed
+
+  - set_fact:
+      S3FileStorageAwsKey: "{{ user.results[0].user_meta.access_keys[0].secret_access_key }}"
+    when: user.results[0].changed
+
+  - set_fact:
+     S3FileStorageBucket: "{{ bucket.name }}"
+    when: bucket.changed
+
+  - set_fact:
+     S3LogStorageBucket: "{{ logbucket.name }}"
+    when: logbucket.changed
+
+  - name: Write the results to the S3 vars file
+    local_action: template src="s3.j2" dest="group_vars/s3.yml"
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast and not terraform
+
+  - name: Write the results to the S3 host vars file
+    local_action: template src="s3.j2" dest="private/host_vars/{{ ServerName }}-s3.yml"
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: Append S3 vars file to env file, and strip the yml header "---" via sed
+    local_action: shell sed -n 2,200p private/host_vars/{{ ServerName }}-s3.yml >> private/host_vars/{{ ServerName }}.yml
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: render AWS-IAM Template
+    local_action: template src="AWS-IAM-Policy.json.j2" dest="roles/aws-s3/files/AWS-IAM-Policy.json"
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: render AWS-S3 Bucket Policy Template
+    local_action: template src=AWS-S3-BucketPolicy.json.j2 dest=roles/aws-s3/files/AWS-S3-BucketPolicy.json
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: render AWS-IAM Log Template
+    local_action: template src="AWS-IAM-LogPolicy.json.j2" dest="roles/aws-s3/files/AWS-IAM-LogPolicy.json"
+    when: (user.results[0].changed or logbucket.changed) and not Slartibartfast
+
+  - name: render AWS-S3 Log Bucket Policy Template
+    local_action: template src=AWS-S3-LogBucketPolicy.json.j2 dest=roles/aws-s3/files/AWS-S3-LogBucketPolicy.json
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: Sleep for a few seconds, which allows the bucket policy to finish writing to disk
+    pause: seconds=5
+    when: not Slartibartfast
+
+  - name: apply S3 bucket policy to the bucket
+    s3_bucket:
+      name: "{{ bucket.name }}"
+      policy: "{{ lookup('file', 'roles/aws-s3/files/AWS-S3-BucketPolicy.json') }}"
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: apply S3 bucket policy to the log bucket
+    s3_bucket:
+      name: "{{ logbucket.name }}"
+      policy: "{{ lookup('file', 'roles/aws-s3/files/AWS-S3-LogBucketPolicy.json') }}"
+    when: (user.results[0].changed or logbucket.changed) and not Slartibartfast
+
+  - name: Apply IAM policy to the new groups
+    iam_policy:
+      iam_type: group
+      iam_name: "{{ item.group_name }}"
+      policy_name: "{{ ClientName }}-ContentController-S3-ReadWrite"
+      policy_document: "roles/aws-s3/files/AWS-IAM-Policy.json"
+      state: present
+    with_items: "{{ iamgroups.results }}"
+    when: (user.results[0].changed or bucket.changed) and not Slartibartfast
+
+  - name: Apply LogBucket IAM policy to the new groups
+    iam_policy:
+      iam_type: group
+      iam_name: "{{ item.group_name }}"
+      policy_name: "{{ ClientName }}-ContentController-S3-LogReadWrite"
+      policy_document: "roles/aws-s3/files/AWS-IAM-LogPolicy.json"
+      state: present
+    with_items: "{{ iamgroups.results }}"
+    when: (user.results[0].changed or logbucket.changed) and not Slartibartfast
+
+
+  - name: Enable S3 Support in Env.yml
+    local_action: "lineinfile dest='group_vars/env.yml' regexp=^S3FileStorageEnabled line='S3FileStorageEnabled: true'"
+    when: not Slartibartfast and not terraform
+
+  - name: Update S3 bucket definition in Terraform scripts
+    local_action: "lineinfile dest=private/terraform/{{ ServerName }}/terraform.tfvars regexp=^s3_content_bucket line=\"s3_content_bucket = \"{{ bucket.name }}\"\""
+    when: not Slartibartfast and terraform
+
+  - name: Delete the bucket if desired
+    s3_bucket:
+      name: "{{ S3FileStoragePrefix }}-cc-content"
+      state: absent
+      force: yes
+    when: Slartibartfast
+
+  - name: Delete the log bucket if desired
+    s3_bucket:
+      name: "{{ S3FileStoragePrefix }}-cc-content-logs"
+      state: absent
+      force: yes
+    when: Slartibartfast
+
+  - name: Delete the user if desired
+    iam:
+      iam_type: user
+      name: "{{ S3FileStorageIAMUsernamePrompt }}"
+      state: absent
+    when: Slartibartfast
+
+  - name: Let the user know where to find things
+    debug: msg="We have created your s3 config file and all of the s3 resources Content Controller needs in order to use it. Look at group_vars/s3.yml for all of your settings."
+    when: not Slartibartfast and not terraform
