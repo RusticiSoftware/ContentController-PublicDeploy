@@ -13,7 +13,7 @@ use_art: false
 art_url: http://artifactory.rusticisoftware.com/artifactory/cc-snapshot-local/zips/contentcontroller-snapshot.zip
 
 # This should match the name of the build that you have in roles/content-controller/files (if deploying locally)
-build_name: ContentController-0.9.211
+build_name: ContentController-1.0.233
 
 # These settings provision the initial user for the Content Controller web interface.
 cc_username: 'test.user@example.com'
