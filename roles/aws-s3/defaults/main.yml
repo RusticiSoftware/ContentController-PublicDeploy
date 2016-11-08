@@ -1,0 +1,14 @@
+---
+
+# Defaults
+
+env: dev
+# If set to true, Slartibartfast will delete your S3 bucket when you run this play.
+# As such, DONT SET IT TO TRUE.
+Slartibartfast: false
+
+S3FileStorageRegion: "us-east-1"
+
+S3Endpoint: "s3-external-1.amazonaws.com"
+
+S3FileStorageTempDir: "{{ data_root }}/s3temp"

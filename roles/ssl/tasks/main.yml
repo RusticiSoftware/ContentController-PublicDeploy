@@ -1,0 +1,41 @@
+---
+
+ - name: Install SSL Public certificate
+   copy: src={{ ssl_certificate }} dest="/etc/ssl/certs/{{ ssl_certificate }}" owner=root group=root mode=0644
+   when: not use_self_signed and use_ssl
+
+ - name: Link directories on RedHat
+   file:
+      state: link
+      src: /etc/pki/tls/private
+      dest: /etc/ssl/private
+   when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+   ignore_errors: true
+
+ - name: Install SSL Private key (Ubuntu)
+   copy: src={{ ssl_key }} dest="/etc/ssl/private/{{ ssl_key }}" owner=root group=ssl-cert mode=0640
+   when: not use_self_signed and use_ssl and ansible_distribution == 'Ubuntu'
+
+ - name: Install SSL Private key (RedHat)
+   copy: src={{ ssl_key }} dest="/etc/ssl/private/{{ ssl_key }}" owner=root group=root mode=0600
+   when: not use_self_signed and use_ssl and ( ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' )
+
+ - name: Install Certificate Chain
+   copy: src={{ ssl_chain }} dest="/etc/ssl/certs/{{ ssl_chain }}" owner=root group=root mode=0644
+   when: not use_self_signed and use_ssl
+
+ - name: Copy over SSL Self-signed cert generation script
+   template: src=genSelfSigned.sh.j2 dest=/usr/local/sbin/genSelfSigned.sh mode=0700 owner=root group=root
+   when: use_self_signed and use_ssl and ansible_distribution == 'Ubuntu'
+
+ - name: create self-signed SSL cert and import into java keystore
+   shell: /usr/local/sbin/genSelfSigned.sh
+   notify: restart httpd
+   register: createssl
+   when: use_self_signed and use_ssl and ansible_distribution == 'Ubuntu'
+
+ - name: Output from Create SSL script
+   debug: msg= {{ createssl.stdout_lines }}
+   ignore_errors: true
+   when: use_self_signed and use_ssl and ansible_distribution == 'Ubuntu'
+

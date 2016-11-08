@@ -1,0 +1,114 @@
+{% if use_ssl and not allow_80 %}
+
+<VirtualHost *:80>
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI}
+</VirtualHost>
+
+{% elif allow_80 %}
+
+<VirtualHost *:80>
+
+    ServerName {{ ServerName }}
+	ServerAdmin {{ ServerAdmin }}
+	ServerSignature Off
+    Options -Indexes
+    
+    Header set X-XSS-Protection: "1; mode=block"
+
+    RewriteEngine on
+
+    #Block access to .git directories
+    RewriteRule ^(.*\/)?\.git - [R=404,L]
+
+    RewriteRule \.ini$ - [R=404,L]
+
+    ##Set max header size to 16Kb
+    ##raise limit to 16Kb to support large cookies created by lectora courses
+    LimitRequestFieldSize 16384
+     
+    JkMount /ScormEngineInterface/* ajp13_worker
+
+    ProxyPreserveHost On
+
+    ProxyPass /api/ http://localhost:8989/api/
+    ProxyPassReverse /api http://localhost:8989/api/
+
+    <Location "/api/">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+    </Location>
+
+    ProxyPass /ops http://localhost:8981/ops
+    ProxyPassReverse /ops http://localhost:8981/ops
+
+    <Location "/ops">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+    </Location>
+
+    ProxyPass /healthcheck http://localhost:8981/healthcheck
+    ProxyPassReverse /healthcheck http://localhost:8981/healthcheck
+
+    <Location "/healthcheck">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+    </Location>
+
+    ProxyPass /ping http://localhost:8981/ping
+    ProxyPassReverse /ping http://localhost:8981/ping
+
+    <Location "/ping">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        RequestHeader set  X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+
+	DocumentRoot {{ html_path }}
+
+    <Directory {{ html_path }}>
+		Options FollowSymLinks MultiViews
+		AllowOverride None
+		Order allow,deny
+		allow from all
+
+        <FilesMatch "\.(htm|html)$">
+            ExpiresActive On
+            ExpiresDefault A1
+            Header append Cache-Control must-revalidate
+        </FilesMatch>
+
+	</Directory>
+          
+    ErrorLog /var/log/apache2/error.log
+
+    # Possible values include: debug, info, notice, warn, error, crit,
+	# alert, emerg.
+	LogLevel warn
+
+	SetEnvIf REMOTE_ADDR "(.+)" CLIENTIP=$1
+	SetEnvIf X-Forwarded-For "^([0-9.]+)" CLIENTIP=$1
+	LogFormat "%{CLIENTIP}e %l %u %t %D \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" trueip_combined
+
+	CustomLog /var/log/apache2/access.log trueip_combined
+
+</VirtualHost>
+
+{% endif %}
