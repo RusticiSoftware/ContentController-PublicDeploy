@@ -10,7 +10,7 @@
     SSLCertificateFile /etc/ssl/certs/{{ ssl_certificate }}
     SSLCertificateKeyFile /etc/ssl/private/{{ ssl_key }}
 
-    {% if not use_self_signed %}
+    {% if not use_self_signed and ssl_chain != None %}
     SSLCertificateChainFile /etc/ssl/certs/{{ ssl_chain }}
     {% endif %}
     
