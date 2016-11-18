@@ -22,7 +22,7 @@
 
  - name: Install Certificate Chain
    copy: src={{ ssl_chain }} dest="/etc/ssl/certs/{{ ssl_chain }}" owner=root group=root mode=0644
-   when: not use_self_signed and use_ssl
+   when: not use_self_signed and use_ssl and ssl_chain != None
 
  - name: Copy over SSL Self-signed cert generation script
    template: src=genSelfSigned.sh.j2 dest=/usr/local/sbin/genSelfSigned.sh mode=0700 owner=root group=root
