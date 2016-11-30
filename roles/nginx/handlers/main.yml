@@ -1,0 +1,9 @@
+---
+
+  - name: restart httpd
+    service: name=nginx state=restarted
+
+  - name: start httpd
+    action: service name=nginx state=started
+
+
