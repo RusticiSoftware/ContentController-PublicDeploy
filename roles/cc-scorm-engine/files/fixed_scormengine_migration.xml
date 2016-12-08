@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<migration>
+  <!--
+    A list of foreign keys for which we can reasonably expect there to be
+    orphaned rows. Normally, if we encounter orphaned rows for a given foreign
+    key, we will delete them, but we will display an error message at the end
+    of the upgrade. For foreign keys in this list, we will simply issue a
+    warning and move on.
+  -->
+  <ignores>
+    <foreign_key name="FK_TinCanRegistration_1">
+      <!-- List which database should ignore the FK. If none are given, it applies to all DBs.
+           Note that this specifies the -source- DBMS type, not the destination. -->
+      <database name="postgres"/>
+      <database name="oracle"/>
+    </foreign_key>
+    <foreign_key name="FK_TinCanPackage_1">
+      <database name="postgres"/>
+      <database name="oracle"/>
+    </foreign_key>
+    <!--Our 2010.1 schema did not have this constraint and MySQL did not enforce it on upgrade -->
+    <foreign_key name="FK_ScormActivityRTObjective_1">
+      <database name="mysql"/>
+    </foreign_key>
+  </ignores>
+  <!--
+    Syntax explanation
+
+    During the upgrade, if a conversion exists (or if the table can't be altered in-place), tables
+    are copied row by row. For each row, the columns for the target schema will be copied from the
+    column of the same name in the source data, unless a conversion applies.
+
+    Each conversion has two required attributes:
+      - toColumn: The conversion will apply only if the name of the column being processed
+        matches the attribute value (case-insensitive).
+      - conversionType: The type of the conversion. Valid values are "map", "method", and "query".
+        - map: The conversion should not have a body. The value from the source column will be
+          copied to the target column. This conversion may disappear in the future, when we add
+          support for renaming columns.
+        - method: The conversion's body should contain the fully qualified name of a static method
+          and the parameters to use. Valid parameters are:
+          - `source.datahelperfactory` or `target.datahelperfactory` (a DataHelperFactory for
+             accessing the source or target database, respectively).
+          - `tenancyhelper` (the TenancyHelper object for the upgrade)
+          - `row` (the whole database row in IDictionary form)
+          - `value` or `row.` followed by a column name (the former returns the value of the data
+            in `fromColumn`; the latter returns the value of the named column). Either one can be
+            followed by a `.` and a modifier:
+            - `tostring`, which will call `.ToString()` on the value
+            - `tolower`, which will call `.ToString().ToLowerInvariant()` on the value.
+            - `asint`, which will call `Convert.ToInt32` on the value.
+        - query: The conversion's body should be a SQL query. Table names should be prefixed by
+          the string `SCHEMA_PREFIX.`. The value of the source column will be passed as a
+          parameter to the query with the name `@value`. The tenant id will be passed in as
+          `@engine_tenant_id`.
+
+    In addition, each conversion supports a number of additional optional parameters.
+      - systemSchema: If given and true, the conversion will match only if the given table is a
+        system table. If given and false, the conversion will match only if the given table is a
+        tenant table. If not given, the conversion can match either system or tenant tables. This
+        is only needed for default conversions, since conversions for a particular table will
+        necessarily already entail that the conversion applies to one or the other.
+      - toType: The conversion will apply only if the target column has the given type. The value
+        of this attribute must be one of the SPParamType enum members.
+      - fromColumn: The conversion will apply only if a column with the name contained in the
+        given attribute exists in the source data. The value of `fromColumn` will be the default
+        value passed into the conversion. If this attribute is not given, it will default to the
+        same value as `toColumn`; to disable the check, the attribute should be empty.
+      - fromType: The conversion will apply only if the from column has the given type. The value
+        of this attribute must be one of the SPParamType enum members.
+      - missingFromColumn: Perform this conversion only if the column named by this attribute value
+        doesn't exist in the source data. This is meant to address situations where a column was
+        added whose value is computed from other columns and won't need to be upgraded again after
+        it is added.
+      - skipIfNull: If the value of `fromColumn` is null, the conversion is skipped and null is
+        used instead.
+      - deferProcessing: This attribute should be "true" or "false". It defaults to false. If
+        true, the conversion applies to the deferred processing step. Note that this means that
+        the schema will already look like the target schema, and source-based attributes won't make
+        sense. Indeed, deferProcessing should only really be used for things that cannot be done
+        until the rest of the upgrade has broadly been completed (for example, query conversions,
+        which need to make assumptions about what the schema is.)
+      - onError: If an error occurs while converting this column, use this value instead.
+      - applyWhen: Valid values are
+        - `always`: The conversion always applies, and will always force a copy upgrade to a given
+          table if it meets the stipulated conditions.
+        - `multiTenant`: The conversion will force a copy upgrade for a given table only if it meets
+          the stipulated conditions and we are doing a multi-tenant upgrade. The conversion will
+          also apply if the given table is being copy-upgraded for other reasons.
+        - `alreadyUpgrading`: The conversion will never force a copy upgrade for a given table. The
+          conversion will only apply if the table is already being copy-upgraded for other reasons.
+
+    Note that if two conversions match a given column, the first match will be selected. Conversions
+    for specific tables take precedence over the default (table-less) conversions.
+  -->
+
+  <!-- conversions that apply regardless of table-->
+  <table>
+    <!-- 2013.x.y stored app_id as a string (the app_id name). -->
+    <conversion toColumn="engine_tenant_id" fromColumn="app_id" fromType="varchar"
+                systemSchema="false" conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFrom2013AppId(value, tenancyhelper)
+    </conversion>
+
+    <!-- 2014.1.x stored app_id as an ID (usually an integer, but sometimes a GUID). -->
+    <conversion toColumn="engine_tenant_id" fromColumn="app_id"
+                systemSchema="false" conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFrom2014SurrogateKey(value.tostring, tenancyhelper)
+    </conversion>
+
+    <!-- Some 2013.x.y tables stored app_id within statement_item_name. Some 2013.x.y tables had
+         app_id as well, in addition to statement_item_name. If a table has both, we favor app_id
+         over statement_item_name. -->
+    <conversion toColumn="engine_tenant_id" fromColumn="statement_item_name"
+                systemSchema="false" conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromStatementItemName(value, tenancyhelper)
+    </conversion>
+
+    <!-- Non-Tin-Can tables from 2014.1 and earlier have no tenant ID column. -->
+
+    <!-- Go in order of least to most derived, so that a table with both will use the shortest path.
+         e.g., ScormRegistration should use the scorm_package_id migration, not scorm_registration_id -->
+    <conversion toColumn="engine_tenant_id" fromColumn="scorm_package_id" missingFromColumn="engine_tenant_id"
+                applyWhen="multiTenant" systemSchema="false" conversionType="method" >
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromPackageId(value.tostring, tenancyhelper)
+    </conversion>
+
+    <!-- scorm_object_id should come before scorm_registration_id; for tables that have both (viz., ScormActivity),
+         scorm_object_id will have better caching behavior (even though the "path length" is the same) -->
+    <conversion toColumn="engine_tenant_id" fromColumn="scorm_object_id" missingFromColumn="engine_tenant_id"
+                applyWhen="multiTenant" systemSchema="false" conversionType="method" >
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromObjectId(value.tostring, tenancyhelper)
+    </conversion>
+
+    <conversion toColumn="engine_tenant_id" fromColumn="scorm_registration_id" missingFromColumn="engine_tenant_id"
+                applyWhen="multiTenant" systemSchema="false" conversionType="method" >
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromRegistrationId(value.tostring, tenancyhelper)
+    </conversion>
+
+    <conversion toColumn="engine_tenant_id" fromColumn="scorm_activity_id" missingFromColumn="engine_tenant_id"
+                applyWhen="multiTenant" systemSchema="false" conversionType="method" >
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromActivityId(value.tostring, tenancyhelper)
+    </conversion>
+
+    <!-- `version` column for TinCanDocuments and TinCanStatementIndex from 2013.x.y. -->
+    <conversion   toColumn="version"   toType="int"
+                fromColumn="version" fromType="varchar"
+                conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.ParseXapiVersion(value)
+    </conversion>
+
+    <!-- 2013.x.y "join tables" for TinCanStatementIndex (e.g., TinCanRelatedActivity) -->
+    <conversion toColumn="statement_id" fromColumn="statement_item_name" conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetStatementIdFromStatementItemName(value)
+    </conversion>
+
+    <!-- LWS Global Objective Scope (ScormRegistration, ScormRegistrationSharedDataVal) -->
+    <converstion toColumn="global_objective_scope" conversionType="method" applyWhen="lws">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.ConvertLwsGlobalObjectiveScopeToApi(value)
+    </converstion>
+
+    <!--
+      ObjectStore table columns.
+
+      Late in the development process of 2015.1, we discovered a few bugs related to object keys.
+      The first was a design issue: the original object store keys kept tenant names as part of
+      the object store keys. In 2015.1.x, tenants are renamable (and can also be deleted and then
+      recreated), which means that we need to instead use what's constant—the tenant id–to serve
+      as a proper key to the store. But since the tenant ID was already a column for that table,
+      there was no need to even include it.
+
+      The second was an honest bug: it turns out that before 2015.1.x, the output of the Util method
+      we used for hashing was using lower-case hex digits on .NET and upper-case hex digits on Java.
+      Each platform was consistent with itself, so everything worked until you tried to use a .NET
+      database with Java engine, or vice versa. We want to support customers switching platforms,
+      and so we had to fix this. This also means that we have to normalize the case of all the
+      extant object store rows and recalculate their hashes.
+
+      Note the use of the systemSchema flag here: without it, these conversions would match the
+      system-level object store!
+    -->
+    <conversion toColumn="engine_tenant_id" missingFromColumn="engine_tenant_id" fromColumn="object_key"
+                systemSchema="false" conversionType="method">
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromOldKey(value, tenancyHelper)
+    </conversion>
+    <conversion toColumn="object_key_sha1"  missingFromColumn="engine_tenant_id" fromColumn="object_key"
+                systemSchema="false" conversionType="method">
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetNewObjectStoreKeyHashFromOldKey(value, tenancyHelper)
+    </conversion>
+    <conversion toColumn="object_key" missingFromColumn="engine_tenant_id" fromColumn="object_key"
+                systemSchema="false" conversionType="method">
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetNewObjectStoreKeyFromOldKey(value, tenancyHelper)
+    </conversion>
+
+    <!--
+      These conversions define values that would ordinarily be covered by the database's defaults.
+      They are here so that if we are row-copying a row that contains these columns, we don't try to
+      insert null.
+
+      N.B.: These migrations MUST appear after all other migrations; if not, they will take
+      precedence over those other migrations. This is especially important for the engine_tenant_id
+      migration, since it does not have a fromColumn check.
+    -->
+    <conversion toColumn="engine_tenant_id" fromColumn="" missingFromColumn="engine_tenant_id"
+                applyWhen="alreadyUpgrading" systemSchema="false" conversionType="method">
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetDefaultTenantIdForTarget(facilities)
+    </conversion>
+    <conversion toColumn="update_by" fromColumn="update_by" conversionType="coalesce" applyWhen="alreadyUpgrading">
+      unknown
+    </conversion>
+  </table>
+
+  <!-- PENS Tables (note that PENS is a system table!) -->
+  <table name="PensCommand">
+    <conversion conversionType="method" toColumn="lock_id" fromColumn="lock_id">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.FixPensCommandLockId(value)
+    </conversion>
+    <conversion conversionType="method" toColumn="pens_package_id_sha1"
+                fromColumn="pens_package_id" missingFromColumn="pens_package_id_sha1">
+      RusticiSoftware.ScormContentPlayer.Util.EncryptUtils.GetSha1Hash(value)
+    </conversion>
+  </table>
+
+  <!-- 2015.1 Tin Can schema fixes -->
+  <table name="TinCanStatementIndex">
+    <!-- 2013.x.y persisted the "stored" column as a date string, we now use a unix timestamp -->
+    <conversion conversionType="method"
+                  toColumn="stored"   toType="bigint"
+                fromColumn="stored" fromType="varchar">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.DateStringToEpoch(value)
+    </conversion>
+    <!-- These columns were changed in 2015.1 to get around a case-sensitivity bug with hashes -->
+    <conversion conversionType="method" skipIfNull="true"
+                  toColumn="actor_id"   toType="binary"
+                fromColumn="actor_id" fromType="varchar">
+      RusticiSoftware.ScormContentPlayer.Logic.CommonFunctions.HexStringToPaddedBytes(value, 20)
+    </conversion>
+    <conversion conversionType="method" skipIfNull="true"
+                  toColumn="ctx_instructor_id"   toType="binary"
+                fromColumn="ctx_instructor_id" fromType="varchar">
+      RusticiSoftware.ScormContentPlayer.Logic.CommonFunctions.HexStringToPaddedBytes(value, 20)
+    </conversion>
+  </table>
+
+  <!--
+    This column wasn't affected by the case-sensitive hashing bug described above (because none of
+    the consituent parts were themselves hashes), but the tenant ID does need to be removed from it.
+
+    Note that this conversion does change the primary key. This is okay for in-place row copies,
+    though it would be a problem if it ever was deferred processing.
+  -->
+  <table name="TinCanActorProperties">
+    <conversion conversionType="method" toColumn="key_val_hash" fromColumn="" missingFromColumn="key_val_hash">
+      RusticiSoftware.ScormContentPlayer.Logic.TinCan.V09.Implementation.ActorStorage.GetKeyValHash(row.key, row.value)
+    </conversion>
+  </table>
+
+  <!-- TinCanDocuments is subject to some hard-coded conversion code that is not represented here. -->
+  <table name="TinCanDocuments">
+    <!-- A routine 2013.2 -> 2014.1 conversion -->
+    <conversion toColumn="updated" fromColumn="updated" fromType="varchar" conversionType="method">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.DateStringToEpoch(value)
+    </conversion>
+  </table>
+
+  <table name="ScormObjectHierarchy">
+    <conversion          toColumn="engine_tenant_id" fromColumn="parent_scorm_object_id"
+                missingFromColumn="engine_tenant_id" applyWhen="multiTenant"
+                conversionType="method" >
+        RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromObjectId(value.tostring, tenancyhelper)
+    </conversion>
+  </table>
+
+  <table name="ScormPackage">
+    <conversion conversionType="query" toColumn="display_title" fromColumn="scorm_package_id"  deferProcessing="true">
+      SELECT
+        title
+      FROM
+        SCHEMA_PREFIX.ScormObject obj
+      LEFT JOIN
+        SCHEMA_PREFIX.ScormObjectHierarchy soh ON
+          soh.child_scorm_object_id = obj.scorm_object_id AND
+          soh.engine_tenant_id = obj.engine_tenant_id
+      WHERE
+        soh.parent_scorm_object_id IS NULL AND
+        obj.scorm_package_id = @value AND
+        obj.engine_tenant_id = @engine_tenant_id
+    </conversion>
+    <conversion conversionType="query" toColumn="invariant_title" fromColumn="scorm_package_id"  deferProcessing="true">
+      SELECT
+        title
+      FROM
+        SCHEMA_PREFIX.ScormObject obj
+      LEFT JOIN
+        SCHEMA_PREFIX.ScormObjectHierarchy soh ON
+          soh.child_scorm_object_id = obj.scorm_object_id AND
+          soh.engine_tenant_id = obj.engine_tenant_id
+      WHERE
+        soh.parent_scorm_object_id IS NULL AND
+        obj.scorm_package_id = @value AND
+        obj.engine_tenant_id = @engine_tenant_id
+    </conversion>
+    <!-- LWS external keys to API keys conversion -->
+    <conversion conversionType="map" toColumn="api_course_id" fromColumn="package_id"
+                missingFromColumn="api_course_id" applyWhen="lws" />
+  </table>
+
+  <table name="ScormRegistration">
+    <!-- LWS external keys to API keys -->
+    <conversion conversionType="map" toColumn="api_registration_id" fromColumn="registration_id"
+                missingFromColumn="api_registration_id" applyWhen="lws" />
+  </table>
+
+  <table name="ScormRegistrationSharedDataVal">
+    <conversion conversionType="method" toColumn="engine_tenant_id" missingFromColumn="engine_tenant_id" fromColumn="" applyWhen="multiTenant">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.GetTenantIdFromSharedData(row, facilities)
+    </conversion>
+  </table>
+
+  <table name="TinCanForwardingMap">
+    <!-- engine_tenant_id is covered by default conversions -->
+    <conversion conversionType="map" toColumn="pair_id" fromColumn="id" />
+    <conversion conversionType="map" toColumn="source_url" fromColumn="sourceUrl" />
+    <conversion conversionType="map" toColumn="source_username" fromColumn="sourceUsername" />
+    <conversion conversionType="map" toColumn="source_password" fromColumn="sourcePW" />
+    <conversion conversionType="map" toColumn="target_url" fromColumn="targetUrl" />
+    <conversion conversionType="map" toColumn="target_username" fromColumn="targetUsername" />
+    <conversion conversionType="map" toColumn="target_password" fromColumn="targetPW" />
+    <conversion conversionType="map" toColumn="more_url" fromColumn="moreLink" />
+    <conversion conversionType="method" toColumn="last_updated_utc" missingFromColumn="last_updated_utc">
+      RusticiSoftware.ScormContentPlayer.Logic.Upgrade.Conversions.UtcNow()
+    </conversion>
+    <conversion conversionType="coalesce" toColumn="visible_after" missingFromColumn="visible_after">
+      0
+    </conversion>
+  </table>
+
+  <table name="TinCanContentToken" erase="true" />
+  <table name="TinCanLaunchToken" erase="true" />
+</migration>

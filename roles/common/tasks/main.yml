@@ -1,0 +1,202 @@
+---
+
+# This file contains the configs that are common across any and all machines that we use in the ScormCloud-Web environment
+# If it isn't globally applicable, please put it somewhere else.
+# This definition is intended to be run against Vagrant in dev, and AWS instances in QA, staging, and Prod
+# @jmensel
+
+  - name: Gather facts
+    ec2_facts:
+
+  - name: Say what we're up to
+    debug: msg="Environment is {{ env }}.  Server name is {{ ServerName }}."
+
+  - name: Use local apt cache if desired
+    template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf
+    when: use_local_apt_cache and ansible_distribution == 'Ubuntu'
+
+  - name: Remove local apt cache if disabled
+    file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+    when: not use_local_apt_cache and ansible_distribution == 'Ubuntu'
+
+  - name: Copy over rpm for EPEL Repository for RedHat variants
+    copy:
+      src: epel-release-latest-7.noarch.rpm
+      dest: /tmp/epel-release-latest-7.noarch.rpm
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install rpm for EPEL Repository for RedHat variants
+    yum:
+      name: /tmp/epel-release-latest-7.noarch.rpm
+      state: present
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Package | install common packages
+    package: name={{ item }} state=latest update_cache=yes
+    with_items:
+        - curl
+        - ntp
+        - git
+        - cloud-utils
+        - unzip
+        - kpartx
+        - gdisk
+        - libtool
+        - logwatch
+        - ntp
+        - python-pip
+        - ruby
+        - postfix
+        - xfsprogs
+        - zip
+
+  - name: Package | install Ubuntu-specific packages
+    package: name={{ item }} state=latest update_cache=no
+    with_items:
+        - emacs23-nox
+        - vim-nox
+        - s3cmd
+        - libffi-dev
+        - libyaml-dev
+        - syslog-ng-core
+        - python-memcache
+        - python-git
+        - python-passlib
+        - python-software-properties
+        - build-essential
+        - checkinstall
+        - python-dev
+        - monit
+        - python-mysqldb
+        - python-psycopg2
+        - mysql-client-core-5.6
+        - openssl
+        - libssl-dev
+        - zsh
+        - gnupg
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Package | install RedHat-specific packages
+    package: name={{ item }} state=latest update_cache=no
+    with_items:
+        - emacs-nox
+        - vim-enhanced
+        - libffi-devel
+        - libyaml-devel
+        - gcc
+        - make
+        - automake
+        - libtool
+        - patch
+        - binutils
+        - autoconf
+        - bison
+        - flex
+        - gettext
+        - openssl
+        - openssl-devel
+        - MySQL-python
+        - gnupg
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+#  - name: Package | install RedHat Development Tools
+#    yum: name="@^Development Tools" state=latest
+#    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+  - name: Sleep for a few seconds to allow the previous command to finish its business
+    pause: seconds=5
+
+  - name: Run aptitude safe-upgrade
+    apt: upgrade=safe
+    when: not noupgrade and ansible_distribution == 'Ubuntu'
+
+  - name: Run yum update
+    yum: name=* state=latest
+    when: not noupgrade and (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux')
+
+  - name: install pyopenssl
+    pip: name=pyopenssl
+    when: ansible_distribution == 'Ubuntu'
+    
+  - name: install ansible
+    pip: name=ansible version="2.0.1.0"
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install dependencies
+    pip: name=distribute state=latest
+
+  - name: install boto
+    pip: name=boto state=latest
+
+#  - name: install boto configs
+#    template: src=boto-config dest=/etc/boto.cfg
+
+  - name: create ansible directory
+    file: path=/etc/ansible state=directory
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Ansible | install ansible hosts file to enable ansible to run on localhost without fooling around
+    template: src=ansible-hosts dest=/etc/ansible/hosts
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install cronjobs
+    # Common cronjobs will run out of /etc/cron.d/ansible-jobs
+    cron: name="update NTP" cron_file="ansible-jobs" user=root minute="0" hour="10" job="/usr/sbin/ntpdate -u pool.ntp.org" 
+
+  - name: Set timezone to UTC
+    action: shell echo Etc/UTC > /etc/timezone
+
+  - name: Set localtime to UTC
+    file: src=/usr/share/zoneinfo/Etc/UTC dest=/etc/localtime
+
+  - name: Reconfigure tzdata (Ubuntu)
+    action: command dpkg-reconfigure -f noninteractive tzdata
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: MIME Types File
+    template: src=mime.types dest=/etc/mime.types
+
+  - name: Disable reverse DNS lookups on the SSH daemon
+    lineinfile:
+      dest: /etc/ssh/sshd_config
+      regexp: ^UseDNS
+      line: UseDNS no
+      state: present
+    notify:
+      - restart ssh
+      - restart sshd
+
+  - name: Copy over Amazon Inspector GPG key
+    copy:
+      src: inspector.gpg
+      dest: /root/inspector.gpg
+      mode: 0400
+      owner: root
+      group: root
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: import Amazon GPG key
+    command: gpg --import /root/inspector.gpg
+    register: gpgimport
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon sig file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install.sig
+      dest: /root/install.sig
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon inspector install file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install
+      dest: /root/install
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  # If this fails, it exits(1) and kills the ansible build, which is desired, as if it fails it means the inspector binary is tainted
+  - name: verify the sig file
+    command: gpg --verify /root/install.sig
+    register: sigfile
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: install the AWS inspector agent
+    command: sudo bash /root/install
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )

@@ -1,0 +1,11 @@
+---
+
+  - name: start monit
+    action: service name=monit state=started
+
+  - name: restart monit
+    action: service name=monit state=restarted
+
+  - name: restart cchealthcheck
+    action: service name=cchealthcheck state=restarted
+

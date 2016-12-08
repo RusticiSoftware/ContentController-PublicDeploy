@@ -1,0 +1,9 @@
+---
+
+# Whomever is root - this is mostly for the apache config.  Not really important, but there if you want it :-)
+ServerAdmin: root@localhost
+
+allow_80: false
+
+# Defined, but null by default
+ssl_chain:

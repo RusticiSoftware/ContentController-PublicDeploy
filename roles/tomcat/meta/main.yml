@@ -1,0 +1,5 @@
+---
+
+dependencies:
+- { role: java, when: not skip_deps }
+- { role: mnt, when: not skip_deps }
