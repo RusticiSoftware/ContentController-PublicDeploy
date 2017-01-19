@@ -52,10 +52,6 @@
     command: "tar -zxf {{java_archive}} -C {{download_folder}} creates={{java_name}}"
     when: (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux') and javaup2date|failed
 
-  - name: Fix ownership (RedHat)
-    file: state=directory path={{java_name}} owner=root group=root recurse=yes
-    when: (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux') and javaup2date|failed
-
   - name: Make Java available for system (RedHat)
     command: 'alternatives --install "/usr/bin/java" "java" "{{java_name}}/bin/java" 2000'
     when: (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux')
