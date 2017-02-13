@@ -1,0 +1,43 @@
+---
+
+#In order to download releases of Content Controller, you'll need to have a keypair 
+#(The folks at Rustici will provide you with a keypair to use)
+s3_download_key: 
+s3_download_secret: 
+use_s3_release: false
+
+# This stuff is only here for when we're doing internal builds.
+# The download won't work outside of our internal network, anyway.  
+# But if you want to break a bunch of stuff, be my guest :-)
+use_art: false
+art_url: http://artifactory.rusticisoftware.com/artifactory/cc-snapshot-local/zips/contentcontroller-snapshot.zip
+
+# This should match the name of the build that you have in roles/content-controller/files (if deploying locally)
+build_name: ContentController-1.1.280
+
+# These settings provision the initial user for the Content Controller web interface.
+cc_username: 'test.user@example.com'
+cc_user_full_name: 'Test User'
+cc_user_password: 'test^passWord12'
+cc_user_email: 'test.user@example.com'
+
+# Escalate rights for ContentController database user when running migrations
+escalate: true
+
+# Send metrics data to Datadog.
+use_datadog: false
+
+# prevent user data from being exposed in the UI.
+# Note that this is a string value, not a boolean, as fills in a string in the contentcontroller.yml template file.
+sanitizeLearnerInfo: "false"
+
+# The The maximum idle time for a connection, once established.  Append "ms" to the value
+jerseyClientTimeout: 5000ms
+# The maximum time to wait for a connection to open.
+jerseyClientConnectionTimeout: 2000ms
+
+# Enable remote JVM debugging for the contentcontroller-service application.
+remote_debugging: false
+
+# Defined, but null by default
+ssl_chain:

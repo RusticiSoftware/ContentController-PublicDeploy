@@ -1,0 +1,15 @@
+---
+
+  - name: update apt cache
+    apt: update_cache=yes  cache_valid_time=86400
+
+  - name: install postfix packages
+    package: name={{ item }} state=present
+    with_items:
+      - postfix
+      - libsasl2-modules
+
+  - name: install main.cf
+    template: src=main.cf.j2 dest=/etc/postfix/main.cf
+    notify: restart postfix
+

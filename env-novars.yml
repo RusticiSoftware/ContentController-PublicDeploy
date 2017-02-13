@@ -1,0 +1,20 @@
+---
+
+- hosts: all
+  sudo: yes
+  force_handlers: True
+  roles:
+    - common
+    - { role: qa-dev, when: ansible_distribution == 'Ubuntu' }
+    - tomcat
+    - ssl
+    - mnt
+    - java
+    - { role: mysql-local, when: cc_db_host == "localhost" }
+    - { role: mysql-config, when: initialize_mysql }
+    - apache
+    - { role: cloudfront, when: use_cloudfront}
+    - content-controller
+    - cc-scorm-engine
+    - { role: monit, when: ansible_distribution == 'Ubuntu' }
+    #- post-install
