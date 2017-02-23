@@ -1,0 +1,19 @@
+---
+
+env: dev
+
+# Use a local apt-cacher server to fetch packages
+use_local_apt_cache: false
+local_apt_cache_host: ""
+
+# Just some sane defaults so the boto module will install cleanly.
+aws_region: "us-east-1"
+aws_access_key: 
+aws_secret_key: 
+
+noupgrade: false
+
+# If you're running on an AWS instance and set this to true,
+# ansible will install the AWS inspector agent for you
+# setting this to true on a non-AWS ec2 box will have no effect.
+aws_inspector: false

@@ -1,0 +1,8 @@
+enable_statement_conversion: "False"
+
+# engine syslog log level
+# Should be one of the following, listed here in descending verbosity:
+# trace, debug, info, warn, error
+# trace and debug will blow up busy servers
+# and info shouldn't be used on busy production boxes if it's avoidable
+engine_log_level: "info"
