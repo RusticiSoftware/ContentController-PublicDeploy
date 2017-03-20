@@ -1,0 +1,11 @@
+[Boto]
+ec2_region_name = {{ aws_region }}
+
+[rustici-release-cc]
+aws_access_key_id={{ s3_download_key }}
+aws_secret_access_key={{ s3_download_secret }}
+
+[Credentials]
+aws_access_key_id={{ aws_access_key }}
+aws_secret_access_key={{ aws_secret_key }}
+

@@ -1,0 +1,19 @@
+---
+
+- hosts: all
+  sudo: yes
+  force_handlers: True
+  vars_files:
+    - group_vars/env.yml
+    - group_vars/engine_java.yml
+    - group_vars/content_controller.yml
+    - group_vars/s3.yml
+    - group_vars/cloudfront.yml
+    - group_vars/keypair.yml
+  roles:
+    - cloudfront
+    - content-controller
+    - cc-scorm-engine
+    - tomcat
+    - apache
+
