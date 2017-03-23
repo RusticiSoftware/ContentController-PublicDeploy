@@ -9,3 +9,5 @@ engine_log_level: "info"
 
 # Enabling PlayerFramesetAlways will cause the default configuration for any new content/equivalents to be Frameset/Frameset
 PlayerFramesetAlways: false
+
+engine_upgrade: false
