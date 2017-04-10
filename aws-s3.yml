@@ -1,0 +1,22 @@
+---
+
+- hosts: localhost
+  vars_prompt:
+
+    - name: "S3FileStoragePrefix"
+      prompt: "Please enter a prefix for your S3 bucket's name.  Your company name in a DNS-valid format is a good call here, i.e. 'rustici'"
+      default: "mycompany-cc-bucket"
+      private: no
+
+    - name: "S3AWSAccountIDPrompt"
+      prompt: "Please enter the AWS Account ID under which you want to create your bucket"
+      default: 123456789012
+      private: no
+
+    - name: "S3FileStorageIAMUsernamePrompt"
+      prompt: "Enter a username for Content Controller to use for accessing S3."
+      default: "mycompany-managed-cc-s3-user"
+      private: no
+
+  roles:
+    - aws-s3
