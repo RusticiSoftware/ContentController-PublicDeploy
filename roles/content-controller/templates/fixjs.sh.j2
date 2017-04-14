@@ -1,0 +1,5 @@
+#!/bin/sh
+
+find {{ html_path  }}scripts -type f | xargs -I {} grep -l "cc.example.com" {} | xargs -I {} sed -i 's/cc.example.com/{{ ServerName }}/' {}
+
+sed -i 's/cc.example.com/{{ ServerName }}/' {{ html_path }}constants.js

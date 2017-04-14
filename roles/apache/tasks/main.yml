@@ -1,0 +1,178 @@
+---
+
+  - name: stop nginx if it is running
+    service: name=nginx state=stopped
+    ignore_errors: true
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: update apt cache
+    apt: update_cache=yes  cache_valid_time=86400
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install apache packages (Ubuntu)
+    package: name={{ item }} state=present
+    with_items:
+      - apache2
+      - libapache2-mod-jk
+      - libapache2-mod-python
+#      - libapache2-mod-wsgi
+      - libapache2-mod-authnz-external
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: install apache packages (RedHat)
+    package: name={{ item }} state=present
+    with_items:
+      - httpd
+      - httpd-devel
+      - mod_ssl
+    notify: restart httpd
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: symlink dirs on red Hat
+    file:
+      state: link
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+    with_items:
+      - { src: '/etc/httpd', dest: '/etc/apache2' }
+      - { src: '/etc/httpd/conf.d', dest: '/etc/apache2/sites-enabled' }
+      - { src: '/etc/httpd/conf.modules.d', dest: '/etc/apache2/mods-enabled' }
+      - { src: '/etc/httpd/conf.d', dest: '/etc/apache2/conf-enabled' }
+      - { src: '/etc/httpd/conf.modules.d', dest: '/etc/apache2/mods-available' }
+      - { src: '/var/log/httpd', dest: '/var/log/apache2' }
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+    
+  - name: create target dir for mod_jk
+    file:
+      state: directory
+      dest: /opt/mod_jk
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: copy over mod_jk installer
+    unarchive:
+      src: tomcat-connectors-1.2.41-src.tar.gz
+      dest: /opt/mod_jk
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: copy over mod_jk compile script
+    template:
+      src: install_mod_jk.sh
+      dest: /usr/local/bin/install_mod_jk.sh
+      owner: root
+      group: root
+      mode: 0750
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: compile mod_jk
+    command: /usr/local/bin/install_mod_jk.sh
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Remove default config files.
+    shell: rm -f /etc/apache2/sites-enabled/*
+    ignore_errors: yes
+
+  - name: Install config files - apache2.conf
+    action: template src=apache2-v2.conf.j2 dest=/etc/apache2/apache2.conf
+    notify: restart httpd
+    when: use_ssl and ansible_distribution == 'Ubuntu'
+
+  - name: Set Apache to listen on 443 (RedHat)
+    lineinfile: 
+      dest: /etc/httpd/conf/httpd.conf
+      insertafter: ^Listen 80
+      line: Listen 443
+    when: use_ssl and ( ansible_distribution == "RedHat" or ansible_distribution == "CentOS" )
+    notify: restart httpd
+
+  #- name: Install config files - apache2.conf
+  ##  action: template src=apache2-v2.conf.j2 dest=/etc/httpd/conf/httpd.conf
+   # notify: restart httpd
+   # when: use_ssl and ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install config files - default
+    action: template src=000-default.j2 dest=/etc/apache2/sites-enabled/000-default.conf
+    notify: restart httpd
+
+  - name: Install config files - SSL
+    action: template src=contentcontroller.conf.j2 dest=/etc/apache2/sites-enabled/000-default-ssl.conf
+    notify: restart httpd
+    when: use_ssl 
+
+  - name: Install config files - max_clients
+    action: template src=max_clients.conf dest=/etc/apache2/conf-enabled/max_clients.conf
+    notify: restart httpd
+
+  - name: Install config files - security
+    action: template src=security.conf dest=/etc/apache2/conf-enabled/security.conf
+    notify: restart httpd
+
+  - name: Install config files - ssl.conf (Ubuntu)
+    action: template src=ssl-v2.conf.j2 dest=/etc/apache2/mods-available/ssl.conf
+    notify: restart httpd
+    when: use_ssl and ansible_distribution == 'Ubuntu'
+
+  - name: Install config files - ports.conf
+    action: template src=ports.conf dest=/etc/apache2/ports.conf
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install config files - jk.conf (Ubuntu)
+    action: template src=jk.conf dest=/etc/apache2/mods-available/jk.conf
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install config files - jk.conf (RedHat)
+    action: template src=jk.conf dest=/etc/httpd/conf.modules.d
+    notify: restart httpd
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install config files - mpm_prefork.conf (Ubuntu)
+    action: template src=mpm_prefork.conf.j2 dest=/etc/apache2/mods-available/mpm_prefork.conf
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Ensure that libapache2-mod-jk directory exists
+    file: 
+      state: directory
+      path: /etc/libapache2-mod-jk
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Install mod_jk workers.properties
+    action: template src=workers.properties dest=/etc/libapache2-mod-jk/workers.properties
+    notify: restart httpd
+
+  - name: Disable mpm_event
+    action: command a2dismod mpm_event
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Enable required modules (ubuntu)
+    action: command a2enmod rewrite ssl authnz_external proxy proxy_http headers jk python mpm_prefork expires
+    notify: restart httpd
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install Logrotate file (ubuntu)
+    action: template src=apache2.logrotate dest=/etc/logrotate.d/apache.logrotate
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: ensure that service is enabled
+    service: name=httpd enabled=yes state=started
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: ensure that service is enabled
+    service: name=apache2 enabled=yes state=started
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install robots.txt
+    template:
+      src: robots.txt
+      dest: "{{ html_path }}/robots.txt"
+      owner: root
+      group: root
+      mode: 0644
+
