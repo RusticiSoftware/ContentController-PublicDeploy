@@ -1,0 +1,15 @@
+enable_statement_conversion: "False"
+
+# engine syslog log level
+# Should be one of the following, listed here in descending verbosity:
+# trace, debug, info, warn, error
+# trace and debug will blow up busy servers
+# and info shouldn't be used on busy production boxes if it's avoidable
+engine_log_level: "info"
+
+# Enabling PlayerFramesetAlways will cause the default configuration for any new content/equivalents to be Frameset/Frameset
+PlayerFramesetAlways: false
+
+# By default, the engine upgrade migrations don't run.
+# specify this at build time if they need to run.
+engine_upgrade: false
