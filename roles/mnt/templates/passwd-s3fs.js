@@ -1,0 +1,1 @@
+{{ S3FileStorageAwsId }}:{{ S3FileStorageAwsKey }}
