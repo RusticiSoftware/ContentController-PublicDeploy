@@ -1,0 +1,43 @@
+---
+
+  # We have to ensure that the tomcat group exists before we mount stuff
+
+  - name: add group "tomcat"
+    group: name=tomcat
+
+  - name: add user "tomcat"
+    user: name=tomcat group=tomcat home=/usr/share/tomcat createhome=no
+    sudo: True
+
+  - name: Remove old mount file bits if they are still lying around
+    file: path={{ item }} state=absent
+    with_items:
+    - /usr/local/bin/aws-mnt.sh
+    - /etc/init/mnt-init.conf
+
+  - name: Create data_root and courses directory if needed
+    file:
+      path="{{ item }}" state=directory
+      owner=tomcat
+      group=tomcat
+    with_items:
+      - "{{ data_root }}"
+      - "{{ content_root }}"
+      - "{{ content_root }}/courses"
+
+  - name: Remove old mount file bits if they are still lying around
+    file: path={{ item }} state=absent
+    with_items:
+    - /usr/local/bin/aws-mnt.sh
+    - /etc/init/mnt-init.conf
+
+  - name: Create directories as needed for tomcat
+    file: path={{ item }} state=directory mode=0755 owner=tomcat group=tomcat
+    with_items:
+      - "{{ content_root }}"
+      - "{{ content_root }}/uploads"
+      - "{{ content_root }}/courses"
+      - "{{ content_root }}/xapi"
+      - "{{ data_root }}/exports"
+      - "{{ data_root }}/s3temp"
+      - "{{ data_root }}/tmp"
