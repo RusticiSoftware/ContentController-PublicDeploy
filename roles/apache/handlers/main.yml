@@ -1,0 +1,17 @@
+---
+
+  - name: restart httpd
+    service: name=apache2 state=restarted
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: start httpd
+    action: service name=apache2 state=started
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: restart httpd
+    service: name=httpd state=restarted
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: start httpd
+    action: service name=httpd state=started
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'

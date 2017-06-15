@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Context useRelativeRedirects="true">
+    <WatchedResource>WEB-INF/web.xml</WatchedResource>
+
+    <Resource name="jdbc/{{ engine_db_name }}" auth="Container"
+              type="javax.sql.DataSource"
+              description="MySQL database for ScormEngine"
+              driverClassName="org.mariadb.jdbc.Driver"
+
+              username="{{ engine_db_username }}"
+              password="{{ engine_db_password }}"
+              url="jdbc:mysql://{{ cc_db_host }}/{{ engine_db_name }}"
+
+              maxTotal="32"
+              maxIdle="8"
+              maxWaitMillis="1000"
+              validationQuery="SELECT 1 -- Engine Health Check"
+              validationQueryTimeout="3"
+              testWhileIdle="true"
+              minEvictableIdleTimeMillis="60000"
+              timeBetweenEvictionRunsMillis="10000"
+            />
+</Context>

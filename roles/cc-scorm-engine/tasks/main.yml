@@ -1,0 +1,97 @@
+---
+
+    - name: Install context.xml 
+      template:
+        src=context.xml.j2
+        dest="{{ tomcat_base }}/conf/context.xml"
+
+    # Pulls the ccupdated value from the content-controller role
+    # If we have updated the zip file, we need to blow away the app
+    - name: Remove ScormEngineInterface webapp
+      file: path="{{ tomcat_base }}/webapps/ScormEngineInterface" state=absent
+      when: ccupdated.changed
+
+    - name: Creates ScormEngineInterface directory
+      file: path={{ tomcat_base }}/webapps/ScormEngineInterface state=directory mode=0750 owner=tomcat group=tomcat
+
+    - name: Explode ScormEngineInterface.war
+      unarchive: src="{{ temp_path }}/engine/ScormEngineInterface.war" dest={{ tomcat_base }}/webapps/ScormEngineInterface force=yes copy=no owner=tomcat group=tomcat
+
+    - name: Install ScormEngineSettings.properties file
+      template: src=ScormEngineSettings.properties.j2 dest="{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/classes/SCORMEngineSettings.properties"
+      notify: 
+      - restart tomcat7
+      - restart httpd
+
+    - name: Install web.xml file
+      template: src=web.xml.j2 dest="{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/web.xml"
+      notify: 
+      - restart tomcat7
+      - restart httpd
+
+    - name: Create EngineInstall.xml
+      template:
+        src=EngineInstall.xml.j2
+        dest="{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/EngineInstall.xml"
+      when: initialize_mysql
+      notify: 
+      - restart tomcat7
+      - restart httpd
+
+    - name: Create logback.xml as used by the upgrade tool
+      template:
+        src=logback.upgrade.xml.j2
+        dest="{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/logback.xml"
+      when: initialize_mysql
+      notify:
+      - restart tomcat7
+      - restart httpd
+
+    - name: Create logback.xml used by Engine proper
+      template:
+        src=logback.engine.xml.j2
+        dest="{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/classes/logback.xml"
+      when: initialize_mysql
+      notify:
+      - restart tomcat7
+      - restart httpd
+
+    - name: Determine if ScormEngineDB is already installed
+      command: mysql -u {{ mysql_root_user }} -p{{ mysql_root_password }} -h {{ cc_db_host }} --batch --skip-column-names --execute "SELECT COUNT(*) > 0 AS installed FROM information_schema.tables WHERE table_schema = 'ScormEngineDB' AND table_name = 'ScormPackage';"
+      register: dbinstalled
+      always_run: True
+
+    - name: Install Engine Database Tables (when appropriate)
+      command: "java -cp '{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/lib/*' -Dlogback.configurationFile='{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/logback.xml' RusticiSoftware.ScormContentPlayer.Logic.Upgrade.ConsoleApp {{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/EngineInstall.xml -install" 
+      when: initialize_mysql and dbinstalled.stdout == "0"
+      notify: 
+      - restart tomcat7
+      - restart httpd
+
+    - name: Upgrade Engine Database Tables (when appropriate)
+      command: "java -cp '{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/lib/*' -Dlogback.configurationFile='{{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/logback.xml' RusticiSoftware.ScormContentPlayer.Logic.Upgrade.ConsoleApp {{ tomcat_base }}/webapps/ScormEngineInterface/WEB-INF/EngineInstall.xml"
+      when: engine_upgrade is defined and engine_upgrade
+      notify: 
+      - restart tomcat7
+      - restart httpd
+
+    - name: Clean up default webapps
+      command: "rm -rf {{ tomcat_base }}/webapps/{docs,examples,ROOT}"
+      notify: 
+      - restart tomcat7
+      - restart httpd 
+
+    - name: link scormengine.log into /var/log for convenience 
+      file: src="{{ tomcat_base }}/logs/scormengine.log" dest="/var/log/scormengine.log" state=link force=yes
+
+    - name: install logrotate config
+      template:
+        src: scormengine.logrotate.j2
+        dest: /etc/logrotate.d/scormengine
+        owner: root
+        group: root
+        mode: 0644
+
+
+
+
