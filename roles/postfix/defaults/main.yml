@@ -1,0 +1,10 @@
+---
+
+# Set to true if you want to install postfix.
+use_postfix: false
+
+# For configuring Postfix
+SMTP_Host: smtp.somehost.net
+SMTP_Port: 587
+SMTP_User: someuser@somedomain.com
+SMTP_Password: somepassword
