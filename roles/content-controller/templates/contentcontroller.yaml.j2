@@ -1,0 +1,290 @@
+# The URL at which this application is hosted. This value is used when building dispatch
+# packages for export, so the URL *must* be fully-qualified and accessible from client
+# LMSs. If this value ever changes, then all dispatch packages must be re-exported!
+
+applicationHost: https://{{ ServerName }}
+
+# The URL at which the service layer itself is hosted. Typically, this will be the same
+# as applicationHost. This setting is used when importing content, but is not persisted
+# anywhere - so it may be changed without causing any issues.
+serviceHost: http://{{ serviceHost }}:{{ CC_API_PORT }}
+
+# Jetty server configuration settings.
+server:
+  rootPath: /api/*
+  applicationConnectors:
+    - type: http
+      port: {{ CC_API_PORT }}
+  adminConnectors:
+    - type: http
+      port: {{ CC_ADMIN_PORT }}
+
+# Database connection settings. At a minimum, you will need to set the
+# username, password, and JDBC url.
+# NOTE: Content Controller supports MySQL 5.6 and newer.
+database:
+  # The username and password for connecting to the database.
+  user: {{ cc_db_username }}
+  password: {{ cc_db_password }}
+  # The JDBC URL (e.g, jdbc:mysql://localhost:3306/contentcontroller).
+  url: {{ cc_db_url }}
+
+  # If you prefer to use the MySQL Connector/J library, place the JAR file in
+  # the lib folder, and change this setting to "com.mysql.jdbc.Driver".
+  driverClass: org.mariadb.jdbc.Driver
+
+  # The remaining settings can usually be left at their default values.
+  # See http://www.dropwizard.io/0.9.1/docs/manual/configuration.html#database
+  # for available settings.
+  maxWaitForConnection: 5s
+  validationQuery: "SELECT 1 -- Content Controller Health Check"
+  validationQueryTimeout: 3s
+  minSize: {{ cc_db_pool_min_size }}
+  maxSize: {{ cc_db_pool_max_size }}
+  initialSize: {{ cc_db_pool_initial_size }}   # Initial size must be greater than, or equal to `minSize`
+  checkConnectionWhileIdle: true
+  logValidationErrors: true
+  evictionInterval: 10s
+  minIdleTime: 1 minute
+
+# API authentication token settings.
+authToken:
+  # The secret key used to sign API auth tokens. Changing this value will
+  # invalidate existing tokens, requiring users to re-authenticate.
+  # KEEP THIS VALUE SECRET! AN ATTACKER WITH THIS SECRET KEY WILL BE ABLE TO
+  # FORGE API AUTHENTICATION TOKENS!
+  secretKey: {{ secret_key }}
+
+  # The expiration time for auth tokens in minutes. The minimum value is 1
+  # minute, the maximum value is 43200 minutes (30 days), and the default
+  # is 1440 minutes (1 day).
+  expiration: {{ token_exp }}
+
+  # An identifier for the application that is added to authentication tokens.
+  # The default is "ContentController", it can be any arbitrary string or
+  # (ideally) a URL. Changing this value will invalidate existing tokens,
+  # requiring users to re-authenticate.
+  issuer: {{ issuer }}
+
+  # The maximum number of times a user can attempt to log in before their
+  # account is locked.
+  maxLoginAttempts: {{ maxLoginAttempts }}
+
+{% if build_name.split('-')[1] | version_compare('1.1.285', '>') %}
+shareReportToken:
+  # The secret key used to sign API auth tokens. Changing this value will
+  # invalidate existing tokens, requiring users to re-authenticate.
+  # KEEP THIS VALUE SECRET! AN ATTACKER WITH THIS SECRET KEY WILL BE ABLE TO
+  # FORGE API AUTHENTICATION TOKENS!
+  secretKey: {{ secret_key }}
+
+  # The expiration time for auth tokens in minutes. The minimum value is 1
+  # minute, the maximum value is 43200 minutes (30 days), and the default
+  # is 1440 minutes (1 day).
+  expiration: {{ token_exp }}
+
+  # An identifier for the application that is added to authentication tokens.
+  # The default is "ContentController", it can be any arbitrary string or
+  # (ideally) a URL. Changing this value will invalidate existing tokens,
+  # requiring users to re-authenticate.
+  issuer: {{ issuer }}
+{% endif %}
+
+# Dispatch-related configuration settings.
+dispatch:
+  # How long should dispatch download links be available before expiring, in minutes.
+  # The minimum value is 1 minute, and the maximum value is 720000 minutes (500 days).
+  defaultDownloadExpiration: {{ defaultDownloadExpiration }}
+
+# Engine API connection settings.
+engine:
+  # The username and password for connecting to the Engine API, as set in Engine's configuration.
+  clientUser: {{ engine_user }}
+  clientPassword: {{ engine_password }}
+
+  # The Engine API endpoint URL.
+  url: http://localhost:8081/ScormEngineInterface/api/v1/
+
+{% if build_name.split('-')[1] | version_compare('1.1.261', '>=') %}
+  # The Engine TinCan endpoint URL.
+  tincanEndpoint: http://localhost:8081/ScormEngineInterface/TCAPI/
+{% endif %}
+
+   # The username and password Engine should use to access the service layer's
+  # /engine resources. These values must match the "ApiRollupRegistrationAuthUser"
+  # and "ApiRollupRegistrationAuthPassword" properties in Engine's properties file.
+  serviceUser: {{ engine_user }}
+  servicePassword: {{ engine_password }}
+
+# HTTP Client configuration settings. These are used for making dispatch launch requests to Engine.
+jerseyClient:
+  # The The maximum idle time for a connection, once established.
+  timeout: {{ jerseyClientTimeout }}
+  # The maximum time to wait for a connection to open.
+  connectionTimeout: {{ jerseyClientConnectionTimeout }}
+
+# File storage settings. Content controller can use the local filesystem or S3 to store files.
+# If using S3, then set type to "s3", and fill in the additional settings below.
+fileStorage:
+
+{% if S3FileStorageEnabled %}
+  type: s3  # Either "local" or "s3".
+  # S3 file storage settings.
+  s3:
+    # The AWS access key to use for connecting to S3.
+    awsId: {{ S3FileStorageAwsId }}
+    # The AWS secret key to use for connecting to S3.
+    awsKey: {{ S3FileStorageAwsKey }}
+    # The S3 bucket to store files in.
+    bucket: {{ S3FileStorageBucket }}
+    # The S3 endpoint to connect to.
+    endpoint: {{ S3Endpoint }}
+    # The path to a (local) directory for temporary files.
+    tempDir: {{ S3FileStorageTempDir }}
+
+# Content upload and import settings.
+import:
+  # Path to which uploaded files should be saved (e.g. "/mnt/content/uploads"). This path is always
+  # on the local filesystem, even if "fileStorage" is configured to use S3!
+  filePathToUploads: {{ uploads_filepath }}
+  # Path to which imported content should be saved (e.g. "/mnt/content/courses"). This path will
+  # be on either the local filesystem or S3, depending on the "fileStorage" settings.
+  filePathToContent: {{ courses_webpath }}
+  # Web path under which imported content should be served (default is "/courses").
+  webPathToContent: {{ courses_webpath }}
+
+{% elif not S3FileStorageEnabled %}
+  type: local
+
+import:
+  # Path to which uploaded files should be saved (e.g. "/mnt/content/uploads"). This path is always
+  # on the local filesystem, even if "fileStorage" is configured to use S3!
+  filePathToUploads: {{ uploads_filepath }}
+  # Path to which imported content should be saved (e.g. "/mnt/content/courses"). This path will
+  # be on either the local filesystem or S3, depending on the "fileStorage" settings.
+  filePathToContent: {{ courses_filepath }}
+  # Web path under which imported content should be served (default is "/courses").
+  webPathToContent: {{ courses_webpath }}
+{% endif %}
+
+  # The number of background threads to use for import jobs.
+  importThreads: {{ import_threads }}
+
+  # During the import process, the application has to generate "signed URLs" for package
+  # manifest files. These settings control how those URLs are generated.
+  manifestUrlSigning:
+    # The secret key used to sign manifest URLs. KEEP THIS VALUE SECRET! AN ATTACKER WITH
+    # THIS SECRET KEY WILL BE ABLE TO FORGE SIGNED MANIFEST URLS!
+    secretKey: {{ secret_key }}
+
+    # The expiration time for manifest URLs in minutes. The minimum value is 1 minute, the
+    # maximum value is 480 minutes (8 hours), and the default is 10 minutes.
+    #expiration: 10
+
+    # An identifier for the application that is included in the manifest URL signature.
+    # The default is "ContentController", it can be any arbitrary string or (ideally) a URL.
+    issuer: {{ issuer }}
+
+{% if use_cloudfront is defined and use_cloudfront|bool == True %}
+# CloudFront signed cookie settings.
+cloudFront:
+  # The domain name to use for policy statements.
+  resourceDomain: {{ cloudfront_distro_domain }}
+  # The absolute file path to the PRIVATE key file to use for signing.
+  keyFilePath: {{ cc_deploy_path }}/bin/{{ cloudfront_private_key }}
+  # The ID for the CloudFront key pair that is being used for signing.
+  keyPairId: {{ cloudfront_access_key_id }}
+  # How long the cookies should be valid in minutes. This should be greater than the maximum
+  # amount of time you expect learners to have courses open from a single launch. The default
+  # is 1440 minutes (1 day), and the maximum is 43200 minutes (30 days).
+  expiration: 1440
+{% endif %}
+
+logging:
+  level: INFO
+  loggers:
+    "com.rusticisoftware.contentcontroller.service.cli.webpath":
+      level: DEBUG
+      appenders:
+        - type: console
+          # Level Thread Date Logger Message (\n Exception)
+          logFormat: "%-5p %-10t [%d{HH:mm:ss.SSS}] %c{0}: %m%n%rEx"
+  appenders:
+    - type: file
+      threshold: ALL
+      currentLogFilename: /var/log/contentcontroller.log
+      archivedLogFilenamePattern: /var/log/contentcontroller-%d.log.gz
+      archivedFileCount: 3
+
+{% if use_datadog %}
+
+metrics:
+  frequency: 1 minute                       # Default is 1 second.
+  reporters:
+    - type: datadog
+      host: https://app.datadoghq.com/api/               # Optional with UDP Transport
+      #tags:                              # Optional. Defaults to (empty)
+      #includes: []                            # Optional. Defaults to (all).
+      #excludes:                           # Optional. Defaults to (none).
+      prefix: {{ ClientName }}              # Optional. Defaults to (none).
+      #expansions:                           # Optional. Defaults to (all).
+      #metricNameFormatter:                  # Optional. Default is "default".
+      #dynamicTagsCallback:                  # Optional. Defaults to (none).
+      transport:
+        type: http
+        apiKey: {{ datadog_api_key }}
+        #connectTimeout: 5         # Optional. Default is 5 seconds
+        #socketTimeout: 5           # Optional. Default is 5 seconds
+
+{% endif %}
+
+{% if build_name.split('-')[1] | version_compare('0.9.221', '>=') %}
+
+reporting:
+  sanitizeLearnerInfo: {{ sanitizeLearnerInfo }}
+{% if build_name.split('-')[1] | version_compare('1.1.294', '>') %}
+  # Location on the file system that generated report files should be stored
+{% if S3FileStorageEnabled %}
+  generatedFileLocation: {{ generated_file_webpath }}
+{% elif not S3FileStorageEnabled %}
+  generatedFileLocation: {{ generated_file_location }}
+{% endif %}
+{% endif %}
+
+{% endif %}
+
+{% if build_name.split('-')[1] | version_compare('1.1.296', '>=') and enable_automation_api %}
+
+publicApi:
+  enabled: true
+  accessToken:
+    # The secret key used to sign API auth tokens. Changing this value will
+    # invalidate existing tokens, requiring users to re-authenticate.
+    # KEEP THIS VALUE SECRET! AN ATTACKER WITH THIS SECRET KEY WILL BE ABLE TO
+    # FORGE API AUTHENTICATION TOKENS!
+    secretKey: {{ secret_key }}
+
+    # The expiration time for auth tokens in minutes. The minimum value is 1
+    # minute, the maximum value is 43200 minutes (30 days), and the default
+    # is 30 minutes. (Optional)
+    expiration: 30
+
+    # An identifier for the application that is added to authentication tokens.
+    # The default is "ContentControllerApi", it can be any arbitrary string or
+    # (ideally) a URL. Changing this value will invalidate existing tokens,
+    # requiring users to re-authenticate. (Optional)
+    issuer: ContentControllerApi
+
+{% endif %}
+
+{% if build_name.split('-')[1] | version_compare('2.0.0', '>=') and enable_emails %}
+email:
+  enabled: true                             # Allow Content Controller to send emails
+  host: {{ cc_smtp_host }}                  # Defaults to localhost (optional)
+  port: {{ cc_smtp_port }}                  # Defaults to 25 (optional)
+  username: {{ cc_smtp_username }}          # (optional)
+  password: {{ cc_smtp_password }}          # (optional)
+  transport: {{ cc_smtp_transport }}        # One of ['SSL', 'TLS', 'PLAIN'] - Defaults to 'PLAIN' (optional)
+  fromUserName: {{ cc_smtp_from_name }}     # Default from name for emails - Defaults to 'Content Controller' (optional)
+  fromUserEmail: {{ cc_smtp_from_email }}   # Default from email address - Defaults to 'no-reply@contentcontroller.com' (optional)
+{% endif %}
