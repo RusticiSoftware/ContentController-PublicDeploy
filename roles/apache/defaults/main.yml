@@ -1,0 +1,17 @@
+---
+
+# Whomever is root - this is mostly for the apache config.  Not really important, but there if you want it :-)
+ServerAdmin: root@localhost
+
+allow_80: false
+
+# Defined, but null by default
+ssl_chain:
+
+MaxRequestWorkers: 150
+
+html_path: "/var/www/html/"
+
+tomcat_base: "/usr/share/tomcat"
+
+set_ie_compatability_mode_header: false
