@@ -1,0 +1,4 @@
+---
+
+# Assume that we're being run standalone, and skip dependencies
+skip_deps: true

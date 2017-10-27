@@ -1,0 +1,9 @@
+---
+
+# To run these, do:
+# ansible-playbook -i inventory-prod -vv users.yml -u your.username --ask-sudo-pass
+
+- hosts: all
+  sudo: yes
+  roles:
+    - users
