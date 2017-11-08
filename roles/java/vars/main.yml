@@ -1,0 +1,10 @@
+---
+
+# These vars are specific to the RedHat/CentOS Java 8 deployment,
+# and have no effect on the Ubuntu setup
+# Note: When changing the version, make sure the alternatives priority is > than the OpenJDK default
+
+download_url: http://download.oracle.com/otn-pub/java/jdk/8u151-b12/e758a0de34e24606bca991d704f6dcbf/jdk-8u151-linux-x64.tar.gz
+download_folder: /opt
+java_path: "{{download_folder}}/jdk1.8.0_151"
+java_archive: "{{download_folder}}/jdk-8u151-linux-x64.tar.gz"
