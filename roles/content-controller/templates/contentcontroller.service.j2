@@ -1,0 +1,14 @@
+[Unit]
+Description=Content Controller Web Application Container
+After=network.target
+[Service]
+Environment=JAVA_HOME=/opt/jdk1.8.0_151/jre
+Environment=BINDIR={{ cc_deploy_path }}/bin
+Environment=JAVA_OPTS=-Djava.awt.headless=true -Xmx{{ cc_heap_size }} -XX:+UseConcMarkSweepGC
+WorkingDir={{ cc_deploy_path }}/bin
+ExecStart={{ cc_deploy_path }}/bin/./contentcontroller-service server {{ cc_deploy_path }}/bin/contentcontroller.yaml
+#ExecStop={{ tomcat_base }}/shutdown.sh
+User=tomcat
+Group=tomcat
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cd /tmp
+export DEBIAN_FRONTEND=noninteractive
+echo mysql-apt-config mysql-apt-config/enable-repo select mysql-5.6 | sudo debconf-set-selections
+dpkg --install mysql-apt-config_0.3.5-1ubuntu14.04_all.deb
