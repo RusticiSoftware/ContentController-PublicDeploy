@@ -1,0 +1,60 @@
+---
+
+  - name: Apt | install qa-specific packages
+    apt: name={{ item }} state=latest
+    with_items:
+        - mono-devel
+        - mono-gmcs
+        - ant
+        - build-essential
+        - ruby-dev
+        #- mysql-client-core-5.6
+        #- memcached
+
+  - name: Apt | add nodejs GPG key
+    apt_key:
+      url: https://keyserver.ubuntu.com/pks/lookup?op=get&fingerprint=on&search=0x1655A0AB68576280
+      id: "68576280"
+      state: present
+
+  - name: Apt | add nodejs repository
+    apt_repository:
+      repo: "deb https://deb.nodesource.com/node_6.x trusty main"
+      state: present
+
+  - name: Apt | install nodejs-specific packages
+    apt: name={{ item }} state=latest update_cache=yes
+    with_items:
+        - nodejs
+
+  - name: install grunt-cli
+    npm: name=grunt-cli global=yes
+
+  - name: Vagrant | Disable puppet-agent to remove log noise on dev
+    service: name=puppet state=stopped
+    when: env == "dev" or env == "qa"
+    ignore_errors: yes
+
+  - name: Vagrant | Disable chef-client to remove log noise on dev
+    service: name=chef-client state=stopped
+    when: env == "dev" or env == "qa"
+    ignore_errors: yes
+
+  - name: install ruby-saas
+    gem: name="{{ item }}" state=present include_dependencies=yes user_install=no version=3.4.0
+    with_items:
+      - sass
+    become: yes
+    become_user: root
+
+  - name: install ruby-saas (ubuntu user)
+    shell: sudo su -c "gem install sass -v 3.4.0"
+    args:
+      warn: false
+    when: ansible_distribution == "Ubuntu"
+
+  - name: install bower
+    npm:
+      name: bower
+      state: latest
+      global: yes

@@ -1,0 +1,22 @@
+---
+
+- hosts: all
+  sudo: yes
+  force_handlers: True
+  roles:
+    - common
+    - { role: qa-dev, when: ansible_distribution == 'Ubuntu' }
+    - java
+    - tomcat
+    - ssl
+    - mnt
+    - { role: mysql-local, when: cc_db_host == "localhost" }
+    - { role: mysql-config, when: initialize_mysql }
+    - apache
+    - { role: cloudfront, when: use_cloudfront}
+    - content-controller
+    - cc-scorm-engine
+    - monit
+    - { role: dripstat, when: (dripstat is defined and dripstat|bool == true) and ansible_distribution == 'Ubuntu' }
+    - { role: logstash-filebeat, when: (filebeat is defined and filebeat|bool == true) and ansible_distribution == 'Ubuntu' }
+    #- post-install
