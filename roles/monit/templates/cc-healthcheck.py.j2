@@ -1,0 +1,57 @@
+#!/usr/bin/python
+
+# Check the Content Controller Service Layer and make sure that it's running
+# and restart it if there are problems with the healthcheck API call
+
+import json
+import urllib2
+import syslog
+import subprocess
+import logging
+import logging.handlers
+import sys
+import time
+
+restarts = 0
+
+def restartcc(restarts):
+  if restarts < 3:
+
+    try:
+      # Yes, shell=True is dangerous, but we aren't using user input here, so
+      # I'm cool with it.
+      subprocess.check_call("/usr/sbin/service contentcontroller restart", shell=True)
+      restarts += 1
+    except subprocess.CalledProcessError, err:
+      syslog.syslog(syslog,LOG_ERR, "Content Controller Service Layer: OS Error when restarting service, Error Code: %s" % err.output)
+    except:
+      e = sys.exec_info()[0]
+      syslog.syslog(syslog.LOG_ERR, "%s" % e )
+
+def webcheck(restarts):
+  try:
+    data = json.load(urllib2.urlopen('http://localhost:8981/healthcheck', None, 2))
+  except urllib2.HTTPError, err:
+    if err.code == 500:
+      syslog.syslog(syslog.LOG_ERR, "Content Controller Service Layer Restarting: HTTP 500 Error")
+      restartcc(restarts)
+    else:
+      syslog.syslog(syslog.LOG_ERR, "Content Controller Service Layer Restarting: Error Code %s, Reason: %s" % err.code, err.reason)
+      restartcc(restarts)
+  except urllib2.URLError, err:
+    syslog.syslog(syslog.LOG_ERR, "Content Controller Service Layer Restarting: Service is shut down or not responding: %s" % err.reason)
+    restartcc(restarts)
+  except:
+    e = sys.exec_info()[0]
+    syslog.syslog(syslog.LOG_ERR, "%s" % e )
+
+while True:
+  if restarts == 0:
+    webcheck(restarts)
+    time.sleep(30)
+  elif restarts <= 2:
+    webcheck(restarts)
+    time.sleep(120)
+  elif restarts >= 3:
+    time.sleep(3600)
+    restarts = 0

@@ -1,0 +1,28 @@
+---
+- name: Set internal vars for JDK 1.8.0_152
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b16"
+    jdk_tarball_hash: aa0333dd3019491ca4f6ddbe78cdb6d0
+  when: java_version == 8 and java_subversion == 152
+
+- name: Set internal vars for JDK 1.8.0_151
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b12"
+    jdk_tarball_hash: e758a0de34e24606bca991d704f6dcbf
+  when: java_version == 8 and java_subversion == 151
+
+- name: Set internal vars for JDK 1.8.0_141
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b15"
+    jdk_tarball_hash: 336fa29ff2bb4ef291e347e091f7f4a7
+  when: java_version == 8 and java_subversion == 141
+
+- name: Set internal vars for JDK 1.8.0_131
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b11"
+    jdk_tarball_hash: d54c1d3a095b4ff2b6607d096fa80163
+  when: java_version == 8 and java_subversion == 131
+
+- name: Compose URL for downloading Java
+  set_fact:
+    jdk_tarball_url: "http://download.oracle.com/otn-pub/java/jdk/{{ jdk_version_detail }}/{{ jdk_tarball_hash }}/{{ jdk_tarball_file }}"

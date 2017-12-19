@@ -1,0 +1,193 @@
+---
+layout: post
+title:  "Ansible Deployment"
+date:   2016-06-10 17:55:06 -0500
+categories: cloudfront s3 ansible deployment
+---
+
+![RusticiContentControllerLogo]({{site.url}}{{site.baseurl}}/assets/Rustici_ContentController.png)
+
+# Content Controller Ansible Playbook Installation HowTo
+
+* TOC
+{:toc}
+
+## Getting Support
+
+As you prepare to deploy your environment, please remember that we are here to help!  Team Delight is all about finding ways to make things work for you - don't hesitate to give us a call if you have questions or need advice!
+
+Email: support@scorm.com
+Phone: 866.497.2676
+
+## Preparation
+
+You'll need to prepare a machine (or several, as needed) running Ubuntu 14.04 LTS 64-bit, and have it accessible via ssh.  A totally stock server build is fine - Ansible will install everything that Content Controller needs in order to run.
+
+## Hardware Requirements
+
+Content Controller likes to run all by itself, on it's own box, at least when you're using it in production for a bunch of users.  If you just need a test environment, stick it on any old box and it'll run fine, no worries, knock yourself out.  For production deployments, though, it wants resources all to itself.  We don't support running Content Controller in production on systems that are also running other production web applications.  
+
+Here are some good sizing numbers to start with.  We like to think in terms of the number of Registration Launches per hour that your Content Controller installation will have to handle - it's the heaviest operation that the system does, and is directly correlated to the number of active users you have.
+
+Memory is the biggest limiting factor when running Content Controller.  When in doubt, use boxes with lots of RAM, and don't worry so much about CPU and IOPS.
+
+### Development and Testing Environments:
+
+We run our QA/Test environment for Content Controller on a t2.medium EC2 instance which has the following spec:
+
+* 4 GB RAM
+* 2 vCPU, running on a 2.4 GHz Xeon E5-2676
+
+This box is running the whole shebang, database and all, and it's fine for testing stuff.  We also run it successfully in Parallels and Virtual Box VMs of similar specification for dev stuff.  
+
+### Production Environments
+
+Every environment is unique, but we've found that the following guidelines are a great starting point:
+
+In load testing, we have successfully served loads of 1000 simultaneous users launching courses and recording results with two AWS EC2 c3.2xlarge front ends and a single RDS r3.4xlarge Database backend.   In bare-metal terms, that translates into:
+
+Web Front End:
+
+* 15GB RAM
+* 4 vCPUs running on a 2.4 GHz Xeon E5-2676
+* 80GB of local storage (not content storage)
+
+MySQL Database Server:
+
+* 122 GB RAM
+* 16 vCPUs running on a 2.4 GHz Xeon E5-2676
+
+OK, that's a super-gigantic database server.  You can probably get by with a lot less.  Give us a call and tell us about your environment and we'll help you spec something that works for you and doesn't cost the Earth.
+
+[Please have a look at the Hosting and Infrastructure documentation in our knowledgebase](http://support.scorm.com/hc/en-us/categories/115000007313-Hosting-Infrastructure-and-Servers) - the info there is specific to SCORM Engine, but it is all directly applicable to hosting Content Controller at scale.
+
+[Please have a look at this Architectural Diagram for an overview of a production grade AWS environment](http://media.amazonwebservices.com/architecturecenter/AWS_ac_ra_web_01.pdf), the architecture of which is also _mostly_ applicable to non-AWS environments.
+
+We also provide Managed Hosted Content Controller installations - this can be a great alternative if you need to get a large-scale production installation up and running quickly.  
+
+### Storage
+
+Storage is the most difficult aspect of sizing to predict - it all depends upon your content.  Are you serving up bunch of little quizzes with a few photos in them?  Don't buy a million-dollar SAN to serve them from :-)  If you're going to be serving up tons and tons of HD video, you're going to want some pretty boss storage, though. Talk to us about your content and we'll help you find a way to spec the environment to suit.
+
+If you're running more than one ContentController front end, you'll need some kind of shared storage mechanism for your SCORM Content.  SCORM Content has to live on a filesystem somewhere (it doesn't get persisted in the database.)  
+
+* [Amazon S3 (We fully support S3 when used with AWS CloudFront)]({% post_url 2016-06-10-CloudFront-Deployment %})
+* An iSCSI target
+* A direct attached SAN of some sort
+* An NFS share
+
+We don't recommend using SMB shares.  You might be able to make it work fine, but please don't ask us to support it.
+
+If you're using AWS, we recommend using [S3 for content storage]({% post_url 2016-06-11-AWS-S3-Support %}) and [CloudFront for distribution]({% post_url 2016-06-10-CloudFront-Deployment %}).  We designed Content Controller to use these technologies, and we test against them with every build.  For a high-performance setup that doesn't cost a fortune, this is the way to go.
+
+## IMPORTANT:  MySQL database config
+
+If you're using Amazon RDS, or are running on a server that is doing binary logging (which is most modern MySQL servers) and upon which your user lacks the SUPER privilege, you'll need to update the following mysql Global Variable in the parameter group associated with your ContentController databases:
+
+To check the value of this variable, do thusly as a privileged mysql user:
+
+	mysql> SHOW VARIABLES LIKE '%log_bin_trust_function_creators%';
+
+To set it, do thusly:
+
+	mysql> SET GLOBAL log_bin_trust_function_creators = 1;
+
+
+If you don't do this, Content Controller database migrations that use triggers will fail, which will cause problems during deployment.
+
+For more information, please see:
+
+https://aws.amazon.com/premiumsupport/knowledge-center/rds-mysql-functions/
+
+https://dev.mysql.com/doc/refman/5.6/en/stored-programs-logging.html
+
+
+## Installing Ansible on your deployment system
+
+You'll need to install Ansible 2.2 or later on a system separate from your Content Controller box.  A Linux or macOS workstation is fine for this.  Don't try to run it on Windows - it won't work.  For production deployments, it's a good idea to have a small system (such as a t2.nano) dedicated to this task.  If you're running at AWS or another cloud provider, you'll see a significant performance boost if you run the Ansible configurations from a system that lives within the Cloud environment, especially if you're controlling a bunch of machines.  
+
+On modern Linux and macOS systems, installing Ansible is usually as easy as running these two commands:
+
+	sudo easy_install pip
+
+	sudo pip install ansible
+
+[If you need help installing Ansible, the official documentation is available here](http://docs.ansible.com/ansible/intro_installation.html#getting-ansible)
+
+## Installing your license keypair
+
+The folks at Rustici will provide you with a license file that will allow Ansible to download Content Controller.  You'll need to put it in the following location:
+
+	`group_vars/keypair.yml`
+
+If you don't have your keypair, no worries.  Just drop Team Delight a line and we'll help you out :-)
+
+Email: support@scorm.com
+Phone: 866.497.2676
+
+## Setting Variables
+
+### Quickstart
+
+If this is your 1st time setting up Content Controller's Ansible configs, run `setup.sh`.  It will create the config files for you from templates, and set good random password and key values for you.
+
+You need to pass it a single command-line argument: the Fully Qualified DNS name for Content Controller.  This is the same value that people will use to access to web interface.
+
+	./setup.sh cc.example.com
+
+If you haven't already set up your license keypair in `group_vars/keypair.yml`, the setup script will give you chance to enter your keypair.
+
+For production environments, you'll need to configure more variables to meet your password policies and to suit your environment.  All of the variables that you'll need to set live in the `group_vars` folder, in the following files:
+
+	env.yml
+	engine_java.yml
+	content_controller.yml
+
+At the top of each file is a section commented thusly - you'll need to set passwords and other essential bits as prompted by the comments in the file.
+
+```
+########################
+# Vars you need to set #
+########################
+```
+
+Each variable is heavily commented, and we've set sane defaults for passwords and keys.  
+
+Stuff that comes after the `Vars you need to set` are optional in most environments or control special features.  
+
+### Configuring S3 for file storage
+
+If you're going to use S3 for file storage, go ahead and configure it now - you can do it later if you REALLY REALLY want to, but it's easier to just go ahead and do it now.  [Head here for documentation.]({% post_url 2016-06-11-AWS-S3-Support %})
+
+## Setting up the inventory file
+
+You'll need to add all of the hosts that you want to configure to the `inventory` file, an example of which lives in this folder.  Add as many hosts as you like - ansible will configure them all for you when you run the playbooks. If you add more than 10 hosts, it may take a while, but it'll go, no worries.
+
+## Running the installation
+
+To configure a brand-new system from scratch, do thusly, where your.user is a user on the Ubuntu 14.04 box that has sudo rights.  
+
+	ansible-playbook --user=your.user --connection=ssh --inventory-file=inventory --extra-vars "initialize_mysql=true" env.yml
+
+To update your system without running the database setup routines, do:
+
+	ansible-playbook --user=your.user --connection=ssh --inventory-file=inventory env.yml
+
+To run only the content-controller role:
+
+	ansible-playbook --user=your.user --connection=ssh  --inventory-file=inventory --extra-vars "skip_deps=true" cc.yml
+
+To run only the cc-scorm-engine role:
+
+	ansible-playbook --user=your.user --connection=ssh  --inventory-file=inventory --extra-vars "skip_deps=true" cc-scorm-engine.yml
+
+If you need to send a sudo password for your user, add this flag:
+
+	--ask-sudo-pass
+
+## Getting Support
+
+As you consider provisioning your environment, please remember that we are here to help!  Team Delight is all about finding ways to make things work for you - don't hesitate to give us a call if you have questions or need advice!
+
+Email: support@scorm.com
+Phone: 866.497.2676

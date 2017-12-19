@@ -1,0 +1,29 @@
+---
+
+# Whomever is root - this is mostly for the apache config.  Not really important, but there if you want it :-)
+ServerAdmin: root@localhost
+
+allow_80: false
+
+# Security settings (don't change these unless you know what you're doing)
+use_hsts: false
+ssl_cipher_suite: "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS"
+
+# Defined, but null by default
+ssl_chain:
+
+MaxRequestWorkers: 150
+
+html_path: "/var/www/html/"
+
+tomcat_base: "/usr/share/tomcat"
+
+set_ie_compatability_mode_header: false
+
+# Set apache state when configuration changes are made. Recommended values:
+# `restarted` or `reloaded`
+apache_restart_state: restarted
+
+# Apache package state; use `installed` to make sure it's installed, or `latest` if
+# you want to upgrade or switch versions using a new repo.
+apache_packages_state: installed
