@@ -1,0 +1,4 @@
+---
+java_install_dir: /usr/lib/jvm
+java_default_link_name: default-java
+java_home: /usr/lib/jvm/default-java
