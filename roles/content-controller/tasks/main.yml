@@ -1,0 +1,177 @@
+---
+
+- name: clean up staging directory
+  shell: "rm -rf {{ temp_path }}"
+
+- name: list available releases for convenience
+  s3:
+    bucket="rustici-release-cc"
+    mode=list
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  register: s3list
+  when: not use_art and use_s3_release
+
+- debug: var=s3list
+
+- name: Fetch the Checksum of the latest release of Content Controller from S3
+  s3:
+    bucket="rustici-release-cc"
+    object={{ item.src }}
+    dest={{ item.dest }}
+    mode=get
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  when: not use_art and use_s3_release
+  with_items:
+    - { src: "{{ build_name }}.zip.sha1", dest: "/tmp/{{ build_name }}.zip.sha1" }
+
+- name: Check to see if we already have a copy of the archive in place
+  stat: path="/tmp/{{ build_name }}.zip"
+  register: build
+
+- name: Fetch contents of downloaded checksum to compare to current build checksum
+  command: "cat /tmp/{{ build_name }}.zip.sha1"
+  register: checksum
+  when: not use_art and use_s3_release
+
+- name: check the checksum
+  command: /bin/true
+  when: (not use_art and use_s3_release) and build.stat.exists and (build.stat.checksum == checksum.stdout)
+  register: filesequal
+  ignore_errors: true
+
+- name: copy over contentcontroller archive
+  copy: src="{{ build_name }}.zip" dest="/tmp/{{ build_name }}.zip" mode=0700 force=true
+  when: not use_art and not use_s3_release
+  register: ccupdated
+
+- name: Fetch a fresh build of Content Controller if you're doing something special
+  get_url: url="{{ art_url }}" dest="/tmp/{{ build_name }}.zip" mode=0700
+  when: use_art and not use_s3_release
+  register: ccupdated
+
+- name: Fetch the latest release of Content Controller from S3
+  s3:
+    bucket="rustici-release-cc"
+    object={{ item.src }}
+    dest={{ item.dest }}
+    mode=get
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  when: not use_art and use_s3_release and (not filesequal or not build.stat.exists)
+  with_items:
+    - { src: "{{ build_name }}.zip", dest: "/tmp/{{ build_name }}.zip" }
+    - { src: "{{ build_name }}.zip.sha1", dest: "/tmp/{{ build_name }}.zip.sha1" }
+  register: ccupdated
+
+- name: create path for deployment files
+  file:
+    path: "{{ temp_path }}"
+    state: directory
+
+- name: ensure that path for client files already exists
+  file: path="{{ html_path }}" state=directory mode=0755
+
+- name: symlink courses folder into the html_path
+  file: path="{{ html_path }}courses" src="{{ courses_filepath }}" state=link
+
+- name: unzip archive on target machine
+  unarchive:
+    src="/tmp/{{ build_name }}.zip"
+    dest="{{ temp_path }}"
+    copy=no
+    force=yes
+
+- name: Create and set permissions on logfile
+  file: path=/var/log/contentcontroller.log state=touch owner=tomcat group=tomcat mode=0640
+
+- name: Creates cc_deploy_path directory
+  file: path={{ cc_deploy_path }} state=directory mode=0750 owner=tomcat group=tomcat
+
+- name: Copy service files to cc_deploy_path
+  shell: "cp -rf {{ temp_path }}/service/. {{ cc_deploy_path }}"
+  notify:
+  - restart contentcontroller
+
+- name: Create config file
+  template:
+    src=contentcontroller.yaml.j2
+    dest={{ cc_deploy_path }}/bin/contentcontroller.yaml
+
+- name: escalate rights for ccontroller mysql user to run migrations
+  mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv="{{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,REFERENCES,INDEX,ALTER,CREATE TEMPORARY TABLES,LOCK TABLES,EXECUTE,CREATE VIEW,SHOW VIEW,CREATE ROUTINE,ALTER ROUTINE,TRIGGER" state=present
+  notify: flush privs
+  when: escalate
+
+- name: run db migration
+  shell: "cd {{ cc_deploy_path }}/bin; ./contentcontroller-service db migrate --outOfOrder contentcontroller.yaml"
+
+- name: set mysql rights back to minimum required set post migration
+  mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv="{{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE,LOCK TABLES,EXECUTE,TRIGGER" state=present
+  notify: flush privs
+  when: escalate
+
+- name: install client files
+  shell: "cp -a {{ temp_path }}/www/. {{ html_path }}"
+  notify:
+  - restart contentcontroller
+
+- name: create documentation folder
+  file: path={{ html_path }}documentation state=directory mode=0755
+
+- name: copy generated service documentation
+  shell: "cp -a {{ temp_path }}/service/dist/documentation/. {{ html_path }}documentation"
+
+- name: add initial user
+  shell: cd {{ cc_deploy_path }}/bin; ./contentcontroller-service user contentcontroller.yaml create -u "{{ cc_username }}" -n "{{ cc_user_full_name }}" -p "{{ cc_user_password }}" -e "{{ cc_user_email }}"
+  when: initialize_mysql
+
+- name: install upstart script (Ubuntu)
+  template:
+    src=contentcontroller.conf.j2
+    dest=/etc/init/contentcontroller.conf
+  notify:
+  - restart contentcontroller
+  when: ansible_distribution == 'Ubuntu'
+
+- name: install systemd init script (RedHat)
+  template:
+    src=contentcontroller.service.j2
+    dest=/etc/systemd/system/contentcontroller.service
+  notify:
+  - start contentcontroller
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+- name: configure service to start on boot
+  command: systemctl enable contentcontroller
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+- name: install js updater
+  template: src=fixjs.sh.j2 dest=/usr/local/sbin/fixjs.sh mode=0700 owner=root group=root
+
+- name: run js updater
+  shell: /usr/local/sbin/fixjs.sh
+  notify:
+  - restart contentcontroller
+
+- name: install SDXD files
+  template: src=templates/{{item.src}} dest=/var/www/html/sdxd/{{item.dest}} mode=0664
+  with_items:
+    - {src: 'configuration.js.j2', dest: 'SCORMDriverXD_CS/configuration.js'}
+    - {src: 'contentAPI.html.j2', dest: 'SCORMDriverXD_CS/contentAPI.html'}
+    - {src: 'contentsample.html.j2', dest: 'remotecontent/contentsample.html'}
+  notify:
+  - restart contentcontroller
+
+- name: archive SDXD files for download
+  shell: "rm -f /var/www/html/sdxd/{{item.dest}} && zip -j /var/www/html/sdxd/{{item.dest}} /var/www/html/sdxd/{{item.src}}"
+  with_items:
+    - {src: 'SCORMDriverXD_CS/contentAPI.html', dest: 'SCORMDriverXD_CS/contentAPI.zip'}
+    - {src: 'remotecontent/contentsample.html', dest: 'remotecontent/contentsample.zip'}
+
+- name: ensure that service is enabled
+  service: name=contentcontroller enabled=yes state=started
