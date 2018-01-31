@@ -1,0 +1,25 @@
+---
+- name: Use local apt cache if desired
+  template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf
+  when: use_local_apt_cache
+
+- name: Remove local apt cache if disabled
+  file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+  when: not use_local_apt_cache
+
+- name: register current mysql-repo apt-key
+  shell: apt-key list | grep '1024D/5072E1F5'
+  become: true
+  register: mysql_apt_key
+  ignore_errors: true
+
+# use hkp protocol to work around hosts that are behind restrictive outbound firewalls
+# that block port 11371
+- name: Update apt-keys for mysql repositories
+  command: apt-key adv --keyserver hkp://pgp.mit.edu:80 --recv-keys 5072E1F5
+  become: true
+  when: mysql_apt_key.rc != 0
+
+- name: Run aptitude safe-upgrade
+  apt: upgrade=safe
+  when: not noupgrade

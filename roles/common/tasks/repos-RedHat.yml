@@ -1,0 +1,14 @@
+---
+- name: Copy over rpm for EPEL Repository for RedHat variants
+  copy:
+    src: epel-release-latest-7.noarch.rpm
+    dest: /tmp/epel-release-latest-7.noarch.rpm
+
+- name: Install rpm for EPEL Repository for RedHat variants
+  yum:
+    name: /tmp/epel-release-latest-7.noarch.rpm
+    state: present
+
+- name: Run yum update
+  yum: name=* state=latest
+  when: not noupgrade
