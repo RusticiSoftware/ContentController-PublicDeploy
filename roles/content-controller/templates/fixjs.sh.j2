@@ -1,0 +1,3 @@
+#!/bin/sh
+# Replace dev base path URL with production path
+find {{ html_path }}scripts -type f | xargs -I {} grep -l 'basePath:{url:"https://cc.example.com' {} | xargs -I {} sed -i 's#basePath:{url:"https://cc.example.com#basePath:{url:"//{{ ServerName }}#' {}
