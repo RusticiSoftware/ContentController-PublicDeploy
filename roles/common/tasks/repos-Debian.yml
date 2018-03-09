@@ -1,0 +1,25 @@
+---
+- name: Use local apt cache if desired
+  template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf
+  when: use_local_apt_cache
+
+- name: Remove local apt cache if disabled
+  file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+  when: not use_local_apt_cache
+
+# Expires 02/17/2019
+- name: Copy apt release signing key for MySQL
+  copy:
+    src: "mysql-releases.key"
+    dest: "/tmp/mysql-releases.key"
+    mode: 0600
+    force: true
+
+- name: Add apt release signing key for MySQL
+  apt_key:
+    file: "/tmp/mysql-releases.key"
+    state: present
+
+- name: Run aptitude safe-upgrade
+  apt: upgrade=safe
+  when: not noupgrade
