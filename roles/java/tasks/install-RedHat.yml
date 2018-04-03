@@ -1,0 +1,48 @@
+---
+- name: Get JDK tarball (as RPM file)
+  get_url:
+    url:     "{{ jdk_tarball_url }}.rpm"
+    headers: 'Cookie:oraclelicense=accept-securebackup-cookie'
+    dest:    "{{ java_download_path }}/{{ jdk_tarball_file }}.rpm"
+
+- name: Uninstall messy Java packages to avoid blocking conditions (if they exist)
+  yum:
+    name: "{{ item }}"
+    state: "absent"
+  with_items:
+    - sun-javadb-core
+    - sun-javadb-client
+    - sun-javadb-docs
+    - sun-javadb-javadoc
+    - sun-javadb-demo
+    - sun-javadb-common
+
+- name: Delete messy .rpm files to avoid blocking conditions (if they exist)
+  command: "rm -f --interactive=never {{ java_download_path }}/{{ item }}"
+  with_items:
+    - "sun-javadb-*.rpm"
+    - "*-linux-amd64.rpm"
+
+- name: install JDK via RPM file with yum
+  yum:
+    name: "{{ java_download_path }}/{{ jdk_tarball_file }}.rpm"
+    state: present
+  register: java_installed
+
+- name: Cleanup messy Java packages (if they exist)
+  yum:
+    name: "{{ item }}"
+    state: "absent"
+  with_items:
+    - sun-javadb-core
+    - sun-javadb-client
+    - sun-javadb-docs
+    - sun-javadb-javadoc
+    - sun-javadb-demo
+    - sun-javadb-common
+
+- name: Cleanup messy .rpm files (if they exist)
+  command: "rm -f --interactive=never {{ java_download_path }}/{{ item }}"
+  with_items:
+    - "sun-javadb-*.rpm"
+    - "*-linux-amd64.rpm"

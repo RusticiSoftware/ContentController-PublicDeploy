@@ -1,0 +1,70 @@
+---
+
+  - name: add group "tomcat"
+    group: name=tomcat
+
+  - name: add user "tomcat"
+    user: name=tomcat group=tomcat home={{ tomcat_base }} createhome=no
+    become: true
+
+  - name: Download Tomcat
+    get_url: url=http://archive.apache.org/dist/tomcat/tomcat-7/v7.0.70/bin/apache-tomcat-7.0.70.tar.gz dest=/opt/apache-tomcat-7.0.70.tar.gz
+
+  - name: Extract archive
+    command: chdir=/usr/share /bin/tar xvf /opt/apache-tomcat-7.0.70.tar.gz -C /opt/ creates=/opt/apache-tomcat-7.0.70
+  
+  - name: set name of tomcat directory
+    set_fact: tomcat_dir="/opt/apache-tomcat-7.0.70"
+    
+  - name: Symlink install directory
+    file: src=/opt/apache-tomcat-7.0.70 path="{{ tomcat_base }}" state=link
+
+  - name: Change ownership of Tomcat installation
+    file: path=/opt/apache-tomcat-7.0.70 owner=tomcat group=tomcat state=directory recurse=yes
+
+  - name: Set ownership of s3temp directory
+    file: path="{{ S3FileStorageTempDir }}" state=directory owner=tomcat group=tomcat mode=0755
+    when: S3FileStorageEnabled
+
+  - name: Create lib directory
+    file: path={{ tomcat_base }}/lib state=directory mode=0750 owner=tomcat group=tomcat
+
+  - name: Configure Tomcat server
+    template: src=server.xml dest={{ tomcat_base }}/conf/
+    notify: 
+    - restart tomcat7
+
+  - name: Install Tomcat upstart script (Ubuntu)
+    template: src=tomcat.conf.j2 dest=/etc/init/tomcat.conf mode=0644
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: Install Tomcat systemd script (RedHat)
+    template: src=tomcat.service dest=/etc/systemd/system/tomcat.service
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+  - name: Install logging.properties
+    action: template src=logging.properties dest={{ tomcat_base }}/conf/logging.properties
+    notify: 
+    - restart tomcat7
+
+  - name: install tomcat-jdbc.jar
+    copy: src=tomcat-jdbc-7.0.59.jar dest={{ tomcat_base }}/lib/tomcat-jdbc-7.0.59.jar
+    notify: 
+    - restart tomcat7
+
+  - name: cleanup default WebApps
+    file: path="{{ tomcat_base }}/webapps/{{ item.name }}" state=absent
+    with_items:
+      - { name: docs }
+      - { name: examples }
+      - { name: ROOT }
+      - { name: host-manager }
+      - { name: manager }
+    notify:
+    - restart tomcat7
+
+  - name: Install logrotate script
+    template: src=tomcat.logrotate.j2 dest=/etc/logrotate.d/tomcat.logrotate
+
+  - name: Symlink Log directory
+    file: src={{ tomcat_base }}/logs path=/var/log/tomcat state=link

@@ -1,0 +1,6 @@
+---
+common_platform_packages:
+  - emacs-nox
+  - vim-enhanced
+  - openssl
+  - openssl-devel

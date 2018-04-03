@@ -1,0 +1,19 @@
+---
+
+- hosts: all
+  become: true
+  force_handlers: True
+  roles:
+    - common
+    - java
+    - tomcat
+    - ssl
+    - mnt
+    - { role: mysql-local, when: cc_db_host == "localhost" }
+    - { role: mysql-config, when: initialize_mysql }
+    - apache
+    - content-controller
+    - cc-scorm-engine
+    - { role: cloudfront, when: use_cloudfront is defined and use_cloudfront|bool == True }
+    - { role: monit, when: ansible_distribution == 'Ubuntu' }
+    - { role: newrelic, when: newrelic_license_key is defined }
