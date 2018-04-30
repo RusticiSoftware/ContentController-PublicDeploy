@@ -1,0 +1,30 @@
+---
+- name: Copy over rpm for EPEL Repository for RedHat variants
+  copy:
+    src: epel-release-latest-7.noarch.rpm
+    dest: /tmp/epel-release-latest-7.noarch.rpm
+
+- name: Install rpm for EPEL Repository for RedHat variants
+  yum:
+    name: /tmp/epel-release-latest-7.noarch.rpm
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: Fetch MySQL yum repo
+  get_url:
+    url: "https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm"
+    dest: "/tmp/mysql57-community-release-el7-11.noarch.rpm"
+    mode: 0750
+
+- name: Install MySQL 5.7 repo
+  yum:
+    name: /tmp/mysql57-community-release-el7-11.noarch.rpm
+    state: present
+
+- name: Run yum update
+  yum: name=* state=latest
+  when: not noupgrade
