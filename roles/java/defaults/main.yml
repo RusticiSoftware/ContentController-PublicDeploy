@@ -1,0 +1,8 @@
+---
+java_version: 8
+java_subversion: 171
+
+java_networkaddress_cache_ttl: 30
+java_networkaddress_cache_negative_ttl: 0
+
+java_force_install: false
