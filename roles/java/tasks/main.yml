@@ -1,0 +1,75 @@
+---
+- name: Fetch Java Version
+  shell: java -version 2>&1 | grep version | awk '{print $3}' | sed 's/"//g'
+  register: java_current_version
+  ignore_errors: true
+
+- name: Log versions
+  debug:
+    msg: "Current Java version: {{ java_current_version.stdout }} -> Requested minimum Java version: {{ jdk_version }}"
+
+- name: Check to see if Java is up to date
+  assert:
+    that: java_current_version.stdout | version_compare(jdk_version, '>=')
+  register: java_up2date
+  ignore_errors: true
+
+- name: "Load {{ ansible_os_family }} variables"
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Set Java version-specific variables
+  include_tasks: "set-jdk-vars.yml"
+
+- name: Install Java
+  include_tasks: "install-{{ ansible_os_family }}.yml"
+  when: java_up2date|failed or java_force_install
+
+- name: Create link for "default-java"
+  file:
+    dest: "{{ java_install_dir }}/{{ java_default_link_name }}"
+    src: "{{ java_install_dir }}/{{ jdk_dist_path }}"
+    state: link
+  when: java_installed is defined and java_installed|succeeded
+
+- name: Create alternatives links for Java tools
+  alternatives:
+    name: "{{ item }}"
+    link: "/usr/bin/{{ item }}"
+    path: "{{ java_install_dir }}/{{ java_default_link_name }}/bin/{{ item }}"
+  with_items:
+    - jar
+    - java
+    - javac
+    - javadoc
+    - javaws
+    - jcontrol
+    - keytool
+    - orbd
+    - pack200
+    - policytool
+    - rmid
+    - rmiregistry
+    - servertool
+    - tnameserv
+    - unpack200
+  when: java_installed is defined and java_installed|succeeded
+
+- name: Remove temporary downloaded files
+  file: path={{ item }} state=absent
+  with_items:
+    - "{{ java_download_path }}/{{ jdk_tarball_file }}.rpm"
+    - "{{ java_download_path }}/{{ jdk_tarball_file }}.tar.gz"
+    - "{{ java_download_path }}/check-tarball-installed.sh"
+  ignore_errors: true
+
+- name: Update networkaddress.cache.ttl in java.security
+  lineinfile:
+    dest: "{{ java_install_dir }}/{{ java_default_link_name }}/jre/lib/security/java.security"
+    regexp: '^networkaddress\.cache\.ttl'
+    line: "networkaddress.cache.ttl={{ java_networkaddress_cache_ttl }}"
+
+- name: Update networkaddress.cache.negative.ttl in java.security
+  lineinfile:
+    dest: "{{ java_install_dir }}/{{ java_default_link_name }}/jre/lib/security/java.security"
+    regexp: '^networkaddress\.cache\.negative\.ttl'
+    line: "networkaddress.cache.negative.ttl={{ java_networkaddress_cache_negative_ttl }}"

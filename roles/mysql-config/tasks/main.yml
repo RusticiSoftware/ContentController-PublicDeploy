@@ -1,0 +1,80 @@
+---
+
+  - name: install dependencies
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - python-mysqldb
+      - mysql-community-client
+    when: ansible_os_family == 'Debian'
+
+  - name: install dependencies
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - MySQL-python
+      - mysql-community-client
+    when: ansible_os_family == 'RedHat'
+
+  - name: copy .my.cnf file with root password credentials
+    template: src=my.cnf.j2 dest=/root/.my.cnf owner=root mode=0600
+
+  # 'localhost' needs to be the last item for idempotency, see
+  # http://ansible.cc/docs/modules.html#mysql-user
+  # We ONLY set this when running this routine against localhost!
+  - name: update mysql root password for all root accounts
+    mysql_user: login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} name=root host={{ item }} password={{ mysql_root_password }} priv=*.*:ALL,GRANT check_implicit_admin=yes
+    with_items:
+      - "{{ ansible_hostname }}"
+      - 127.0.0.1
+      - ::1
+      - localhost
+    when: cc_db_host == "localhost"
+    notify: flush privs
+
+  - name: delete anonymous MySQL server user for $server_hostname
+    action: mysql_user login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} user="" host="{{ ansible_hostname }}" state="absent"
+    when: cc_db_host == "localhost"
+    notify: flush privs
+
+  - name: delete anonymous MySQL server user for localhost
+    action: mysql_user login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} user="" state="absent"
+    when: cc_db_host == "localhost"
+    notify: flush privs
+
+  - name: remove the MySQL test database
+    action: mysql_db login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} db=test state=absent
+    when: cc_db_host == "localhost"
+
+  - name: create the contentcontroller database
+    action: mysql_db login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} db={{ cc_db_name }} state="present" encoding='utf8' collation='utf8_general_ci'
+    when: cc_db_name is defined
+
+  - name: create the scormengine database
+    action: mysql_db login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} db={{ engine_db_name }} state="present" encoding='utf8' collation='utf8_general_ci'
+
+  - name: create contentcontroller MySQL users
+    mysql_user: name="{{ cc_db_username }}" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv={{ cc_db_name }}.*:ALL state=present
+    notify: flush privs
+    when: cc_db_username is defined
+
+  - name: create contentcontroller MySQL users
+    mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv={{ cc_db_name }}.*:ALL state=present
+    notify: flush privs
+    when: ( allhostsmysql is defined and allhostsmysql|bool == True ) and cc_db_username is defined
+
+  - name: explicitly give trigger permissions to the contentcontroller user (for RDS compatibility)
+    mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} append_privs=true priv={{ cc_db_name }}.*:TRIGGER state=present
+    notify: flush privs
+    when: cc_db_username is defined
+
+  - name: create ScormEngine MySQL users
+    mysql_user: name="{{ engine_db_username }}" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ engine_db_password }}" priv={{ engine_db_name }}.*:ALL state=present
+    notify: flush privs
+
+  - name: create ScormEngine MySQL users
+    mysql_user: name="{{ engine_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ engine_db_password }}" priv={{ engine_db_name }}.*:ALL state=present
+    notify: flush privs
+    when: allhostsmysql is defined and allhostsmysql|bool == True
