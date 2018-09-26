@@ -1,0 +1,40 @@
+---
+
+# The cc_db_host var controls the location of all the MySQL databases that we use.  If this is a remote host,
+# you'll need to ensure that you've entered the root password for that MySQL server in env.yml
+cc_db_host: localhost
+cc_db_password: 5jc6Fv1CT97Jsl6E
+
+# The username and password for connecting to the Engine API, as set in Engine's configuration.
+# This credential is used for both the client and service connections between Content Controller and Engine.
+# See roles/content-controller/contencontroller.yaml.j2 for usage
+engine_user: ScormEngine
+engine_password: QoUeZh8Eo68JgRIT
+
+# The secret key used to sign API auth tokens. Changing this value will
+# invalidate existing tokens, requiring users to re-authenticate.
+# KEEP THIS VALUE SECRET! AN ATTACKER WITH THIS SECRET KEY WILL BE ABLE TO
+# FORGE API AUTHENTICATION TOKENS!
+secret_key: FFPJiHlnFQxiRLUDPJYL8rAHHhrLNgqKClR60uh6P28W1C9hZoDqrTWfpCrIxyOO
+
+# These settings provision the initial user for the Content Controller web interface.
+cc_username: 'test.user@example.com'
+cc_user_full_name: 'Test User'
+cc_user_password: 'test^passWord12'
+cc_user_email: 'test.user@example.com'
+
+# This setting enables the automation API
+enable_automation_api: false
+
+# Setting to enable customization of the sign-in screen
+enable_signin_customization: true
+
+# Settings to enable Content Controller to send emails (such as license alert emails)
+enable_emails: false                        # Allow Content Controller to send emails
+cc_smtp_host: localhost                     # Defaults to localhost (optional)
+cc_smtp_port: 25                            # Defaults to 25 (optional)
+cc_smtp_username: user                      # (optional)
+cc_smtp_password: 'password'                # (optional)
+cc_smtp_transport: TLS                      # One of ['SSL', 'TLS', 'PLAIN'] - Defaults to 'PLAIN' (optional)
+cc_smtp_from_name: 'Content Controller'     # Default from name for emails - Defaults to 'Content Controller' (optional)
+cc_smtp_from_email: 'no-reply@example.com'  # Default from email address - Defaults to 'no-reply@contentcontroller.com' (optional)

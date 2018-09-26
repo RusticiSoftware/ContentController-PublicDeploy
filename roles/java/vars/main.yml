@@ -1,0 +1,6 @@
+---
+jdk_arch: "{{ 'i586' if ansible_architecture == 'i386' else 'x64' }}"
+jdk_version: "1.{{ java_version }}.0_{{ java_subversion }}"
+jdk_tarball_file: "jdk-{{ java_version }}u{{ java_subversion }}-linux-{{ jdk_arch }}"
+
+java_download_path: /tmp
