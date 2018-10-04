@@ -1,0 +1,9 @@
+---
+common_platform_packages:
+  - emacs-nox
+  - vim-enhanced
+  - openssl
+  - openssl-devel
+  - mysql-community-client
+  - libselinux-python
+  - policycoreutils-python
