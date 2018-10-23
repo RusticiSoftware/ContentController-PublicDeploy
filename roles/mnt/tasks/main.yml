@@ -1,0 +1,47 @@
+---
+  - name: "Load {{ ansible_os_family }} variables"
+    include_vars: "{{ ansible_os_family }}.yml"
+
+  # We have to ensure that the tomcat group exists before we mount stuff
+  - name: add group "{{ apache_group }}"
+    group: name={{ apache_group }}
+
+  - name: add user "tomcat"
+    user: name=tomcat group=tomcat home=/usr/share/tomcat createhome=no
+    become: true
+
+  - name: Create directories as needed for tomcat
+    file: path={{ item }} state=directory mode=2750 owner=tomcat group={{ apache_group }}
+    with_items:
+      - "{{ data_root }}"
+      - "{{ content_root }}"
+      - "{{ content_root }}/uploads"
+      - "{{ content_root }}/courses"
+      - "{{ content_root }}/courses/assets"
+      - "{{ content_root }}/courses/assets/accounts"
+      - "{{ content_root }}/xapi"
+      - "{{ content_root }}/zips"
+      - "{{ data_root }}/exports"
+      - "{{ data_root }}/s3temp"
+      - "{{ data_root }}/tmp"
+      - "{{ data_root }}/reports"
+
+  - name: Configure SELinux to allow Apache to access folders (RedHat)
+    sefcontext:
+      target: "{{ item }}(/.*)?"
+      setype: httpd_sys_rw_content_t
+      state: present
+      reload: true
+    with_items:
+      - "{{ content_root }}"
+      - "{{ data_root }}/exports"
+      - "{{ data_root }}/s3temp"
+      - "{{ data_root }}/tmp"
+      - "{{ data_root }}/reports"
+    when: ansible_os_family == 'RedHat'
+    ignore_errors: true
+
+  - name: Update SELinux security contexts (RedHat)
+    command: "restorecon -Rv {{ data_root }}"
+    when: ansible_os_family == 'RedHat'
+    ignore_errors: true
