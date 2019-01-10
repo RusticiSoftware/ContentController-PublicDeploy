@@ -1,0 +1,93 @@
+---
+
+  - name: Gather AWS EC2 instance facts
+    ec2_metadata_facts:
+    ignore_errors: true
+
+  - name: Say what we are up to
+    debug: msg="Environment is {{ env }}.  Server name is {{ ServerName }}.  Operating system is {{ ansible_os_family}} / {{ ansible_distribution }}."
+
+  - name: Include OS-specific variables
+    include_vars: "{{ ansible_os_family }}.yml"
+
+  - name: Run OS repository setup tasks
+    include_tasks: "repos-{{ ansible_os_family }}.yml"
+
+  - name: Install packages
+    package:
+      name: "{{ item }}"
+      state: latest
+      update_cache: yes
+    with_items: "{{ common_packages + common_platform_packages }}"
+
+  - name: Sleep for a few seconds to allow the previous command to finish its business
+    pause: seconds=5
+
+  - name: install boto
+    pip: name={{ item }} state=latest
+    with_items:
+    - boto3
+    - botocore
+
+  - name: Install cronjobs
+    # Common cronjobs will run out of /etc/cron.d/ansible-jobs
+    cron: name="update NTP" cron_file="ansible-jobs" user=root minute="0" hour="10" job="/usr/sbin/ntpdate -u pool.ntp.org"
+
+  - name: Set timezone to UTC
+    action: shell echo Etc/UTC > /etc/timezone
+
+  - name: Set localtime to UTC
+    file: src=/usr/share/zoneinfo/Etc/UTC dest=/etc/localtime
+
+  - name: Reconfigure tzdata
+    action: command dpkg-reconfigure -f noninteractive tzdata
+    when: ansible_os_family == 'Debian'
+
+  - name: MIME Types File
+    template: src=mime.types dest=/etc/mime.types
+
+  - name: Disable reverse DNS lookups on the SSH daemon
+    lineinfile:
+      dest: /etc/ssh/sshd_config
+      regexp: ^UseDNS
+      line: UseDNS no
+      state: present
+    notify:
+      - restart ssh
+      - restart sshd
+
+  - name: Copy over Amazon Inspector GPG key
+    copy:
+      src: inspector.gpg
+      dest: /root/inspector.gpg
+      mode: 0400
+      owner: root
+      group: root
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: import Amazon GPG key
+    command: gpg --import /root/inspector.gpg
+    register: gpgimport
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon sig file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install.sig
+      dest: /root/install.sig
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon inspector install file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install
+      dest: /root/install
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  # If this fails, it exits(1) and kills the ansible build, which is desired, as if it fails it means the inspector binary is tainted
+  - name: verify the sig file
+    command: gpg --verify /root/install.sig
+    register: sigfile
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: install the AWS inspector agent
+    command: sudo bash /root/install
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )

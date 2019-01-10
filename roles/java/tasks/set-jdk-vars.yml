@@ -1,0 +1,39 @@
+---
+
+- name: Set internal vars for JDK 1.8.0_192
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b12"
+    jdk_tarball_hash: 750e1c8617c5452694857ad95c3ee230
+  when: java_version == 8 and java_subversion == 192
+
+- name: Set internal vars for JDK 1.8.0_181
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b13"
+    jdk_tarball_hash: 96a7b8442fe848ef90c96a2fad6ed6d1
+  when: java_version == 8 and java_subversion == 181
+
+- name: Set internal vars for JDK 1.8.0_172
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b11"
+    jdk_tarball_hash: a58eab1ec242421181065cdc37240b08
+  when: java_version == 8 and java_subversion == 172
+
+- name: Set internal vars for JDK 1.8.0_171
+  set_fact:
+    jdk_version_detail: "{{ java_version }}u{{ java_subversion }}-b11"
+    jdk_tarball_hash: 512cd62ec5174c3487ac17c61aaa89e8
+  when: java_version == 8 and java_subversion == 171
+
+- name: Compose URL for downloading Java
+  set_fact:
+    jdk_tarball_url: "http://download.oracle.com/otn-pub/java/jdk/{{ jdk_version_detail }}/{{ jdk_tarball_hash }}/{{ jdk_tarball_file }}"
+
+- name: Set JDK dist path
+  set_fact:
+    jdk_dist_path: "jdk{{ jdk_version }}-amd64"
+  when: ansible_os_family == 'RedHat'
+
+- name: Set JDK dist path
+  set_fact:
+    jdk_dist_path: "jdk{{ jdk_version }}"
+  when: ansible_os_family == 'Debian'
