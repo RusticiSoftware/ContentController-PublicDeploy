@@ -1,0 +1,24 @@
+---
+- name: Get JDK tarball (as tar.gz file)
+  get_url:
+    url:     "{{ jdk_tarball_url }}.tar.gz"
+    headers: 'Cookie:oraclelicense=accept-securebackup-cookie'
+    dest:    "{{ java_download_path }}/{{ jdk_tarball_file }}.tar.gz"
+
+- name: Create Java directory
+  file:
+    path: "{{ java_install_dir }}/jdk{{ jdk_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "u=rwx,go=rx"
+
+- name: Extract JDK
+  unarchive:
+    src: "{{ java_download_path }}/{{ jdk_tarball_file }}.tar.gz"
+    dest: "{{ java_install_dir }}"
+    owner: root
+    group: root
+    mode: "go-w"
+    copy: no
+  register: java_installed
