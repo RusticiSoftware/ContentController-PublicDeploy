@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app id="WebApp_id" version="2.4" xmlns="http://java.sun.com/xml/ns/j2ee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee
+        http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
+
+    <display-name>RusticiSoftware.ScormContentPlayer.Interface</display-name>
+
+    <listener>
+        <listener-class>com.rusticisoftware.scormengine.Initializer</listener-class>
+    </listener>
+
+    <error-page>
+        <exception-type>java.lang.Throwable</exception-type>
+        <location>/error-pages/error.jsp</location>
+    </error-page>
+
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error-pages/error.jsp</location>
+    </error-page>
+
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error-pages/404.jsp</location>
+    </error-page>
+
+    <resource-ref>
+        <description>SCORM Engine DB Connection</description>
+        <res-ref-name>jdbc/{{ engine_db_name }}</res-ref-name>
+        <res-type>javax.sql.DataSource</res-type>
+        <res-auth>Container</res-auth>
+    </resource-ref>
+
+    <servlet>
+        <display-name>TCAPI Servlet</display-name>
+        <servlet-name>TCAPIServlet</servlet-name>
+        <servlet-class>com.rusticisoftware.tincan.TCAPIServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TCAPIServlet</servlet-name>
+        <url-pattern>/TCAPI/*</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>TCAPIServlet</servlet-name>
+        <url-pattern>/Recipes/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <description>Helper for Launch Report</description>
+        <display-name>ReportsHelper</display-name>
+        <servlet-name>ReportsHelper</servlet-name>
+        <servlet-class>com.rusticisoftware.scormengine.ReportsHelper</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ReportsHelper</servlet-name>
+        <url-pattern>/reportsHelper</url-pattern>
+    </servlet-mapping>
+
+    <filter>
+        <filter-name>SnaffleRequest</filter-name>
+        <filter-class>RusticiSoftware.ScormContentPlayer.Util.SnaffleRequestFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>SnaffleRequest</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <servlet>
+        <servlet-name>api</servlet-name>
+        <servlet-class>
+            org.glassfish.jersey.servlet.ServletContainer
+        </servlet-class>
+        <init-param>
+          <param-name>javax.ws.rs.Application</param-name>
+          {% if scorm_engine_war_name %}
+            <param-value>com.rusticisoftware.scormengine.dispatch.api.DispatchApiApplication</param-value>
+          {% else %}
+            <param-value>RusticiSoftware.Engine.api.ApiApplication</param-value>
+          {% endif %}
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.provider.packages</param-name>
+            <param-value>com.fasterxml.jackson.jaxrs.json</param-value>
+        </init-param>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>api</servlet-name>
+        <url-pattern>/api/v1/*</url-pattern>
+    </servlet-mapping>
+
+{% if use_cloudfront %}
+    <!--
+        The RemoteIpFilter handles making the "original" URL visibile to other
+        filters when behind a proxy. We don't use the "trusted proxy" feature
+        because there is no need to treat the HTTPS-terminating IPs differently;
+        all traffic to the server is trusted it is behind the subnet.
+    -->
+    <filter>
+        <filter-name>RemoteIpFilter</filter-name>
+        <filter-class>org.apache.catalina.filters.RemoteIpFilter</filter-class>
+        <init-param>
+            <param-name>protocolHeader</param-name>
+            <param-value>x-forwarded-proto</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>RemoteIpFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+    </filter-mapping>
+{% endif %}
+
+    <filter>
+      <filter-name>CorsFilter</filter-name>
+      <filter-class>org.apache.catalina.filters.CorsFilter</filter-class>
+      <init-param>
+        <param-name>cors.allowed.origins</param-name>
+        <param-value>*</param-value>
+      </init-param>
+      <init-param>
+        <param-name>cors.allowed.methods</param-name>
+        <param-value>GET,POST,HEAD,OPTIONS,PUT</param-value>
+      </init-param>
+      <init-param>
+        <param-name>cors.allowed.headers</param-name>
+        <param-value>Content-Type,X-Requested-With,accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers</param-value>
+      </init-param>
+      <init-param>
+        <param-name>cors.exposed.headers</param-name>
+        <param-value>Access-Control-Allow-Origin,Access-Control-Allow-Credentials</param-value>
+      </init-param>
+      <init-param>
+        <param-name>cors.support.credentials</param-name>
+        <param-value>true</param-value>
+      </init-param>
+      <init-param>
+        <param-name>cors.preflight.maxage</param-name>
+        <param-value>10</param-value>
+      </init-param>
+    </filter>
+    <filter-mapping>
+      <filter-name>CorsFilter</filter-name>
+      <url-pattern>/*</url-pattern>
+    </filter-mapping>
+</web-app>

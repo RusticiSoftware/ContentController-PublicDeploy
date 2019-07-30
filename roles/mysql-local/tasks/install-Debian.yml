@@ -1,0 +1,31 @@
+---
+- name: Install server and client with dependecies
+  apt: name={{ item }} state=present dpkg_options='force-confold,force-confdef'
+  with_items:
+    - "mysql-community-server"
+  notify: restart mysql
+
+- name: Install other packages
+  package: name={{ item }} state=present
+  with_items:
+    - python-mysqldb
+    - libmysql-java
+    - mysql-utilities
+
+- name: Bind MySQL server to all interfaces
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^bind-address" line='bind-address = 0.0.0.0'
+  notify: restart mysql
+
+- name: Set default sql_mode
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^sql_mode" line='sql_mode = "NO_ENGINE_SUBSTITUTION"'
+  notify: restart mysql
+
+- name: Start MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    state: started
+    enabled: true
+
+- name: Run MySQL upgrade tool
+  shell: mysql_upgrade
+  ignore_errors: true
