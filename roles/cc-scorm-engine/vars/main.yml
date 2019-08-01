@@ -1,0 +1,66 @@
+---
+
+#mysql
+#mysql_jdbc_driver_url: http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-5.1.35.zip
+engine_db_name: ScormEngineDB
+engine_db_username: scormengine
+engine_db_url: "jdbc:mysql:{{ engine_db_failover_parameter }}//{{ cc_db_host }}/{{ engine_db_name }}"
+
+tomcat_base: /usr/share/tomcat
+# using false here makes ansible look for a ScormEngine package (unzipped release package) in the deploy folder
+# using true will make ansible download the release specified in the engine_package_url var
+download_release: true
+
+# location for ScormEngine package files (Database, ScormEngineInterface.war, etc...)
+deploy_path: /deploy/
+engine_package_path: /deploy/ScormEngine
+
+use_db_installer: true
+use_autotest_integration: false
+
+# This setting can have a powerful effect on database usage in busy environments.
+# It controls how frequently a course calls RecordResults.jsp
+# In milliseconds
+# Default value is 10000
+# Suggest value for a busy environment is 20000
+DefaultCommCommitFrequency: 10000
+
+ApiRollupRegistrationAuthUser:
+ApiRollupRegistrationAuthPassword:
+#tomcat settings
+interface_filepath: "{{ tomcat_base }}/webapps/ScormEngineInterface"
+
+# interface_webpath is deprecated
+# interface_webpath: {{ ServerName }}/ScormEngineInterface
+content_root: "{{ data_root }}/content"
+courses_filepath: "{{ content_root }}/courses"
+courses_webpath: /courses
+uploads_filepath: "{{ content_root }}/uploads"
+
+redirect_on_exit_url: /ScormEngineInterface/tools/console/index.html
+autotest_redirect_on_exit_url: /courses/autotest/closer.html
+
+# We only support MySQL 5.6 for Content Controller
+data_persistence_engine: mysql
+
+#RusticiEngineSettings.properties
+
+database_connection_string: jdbc/{{ engine_db_name }}
+integration_class_name: RusticiSoftware.ScormContentPlayer.api.implementation.ApiIntegration
+autotest_integration_class_name: RusticiSoftware.ScormEngine.AutoTestIntegration.AutoTestIntegration
+
+# system_homepage_url is deprecated
+# system_homepage_url: {{ ServerName }}
+
+enable_scorm_to_tincan: true
+enable_recipes: true
+recipes_sleeptime: 60000
+
+#jenkins slave
+install_jenkins_swarm: false
+jenkins_home: /jenkins
+jenkins_slave_name: vagrant_slave_ubuntu
+
+#testing
+run_scormformance: false
+run_canformance: false
