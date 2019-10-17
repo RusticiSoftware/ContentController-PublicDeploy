@@ -1,0 +1,16 @@
+---
+  - import_tasks: roles/apache/handlers/main.yml
+
+  - name: start contentcontroller
+    action: service name=contentcontroller state=started
+    notify: restart httpd
+
+  - name: restart contentcontroller
+    action: service name=contentcontroller state=restarted
+    notify: restart httpd
+
+  - name: stop contentcontroller
+    action: service name=contentcontroller state=stopped
+
+  - name: restart cchealthcheck
+    action: service name=cchealthcheck state=restarted
