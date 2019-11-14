@@ -1,0 +1,44 @@
+---
+- name: Install Apache
+  yum:
+    name: "{{ item }}"
+    state: "{{ apache_packages_state }}"
+  with_items: "{{ apache_packages }}"
+
+- name: Remove default config files
+  shell: rm -f {{ apache_server_root }}/conf.d/*
+  ignore_errors: yes
+  warn: false
+
+- name: Install config files - httpd.conf
+  template:
+    src: RedHat-httpd.conf.j2
+    dest: "{{ apache_server_root }}/conf/{{ apache_daemon }}.conf"
+  notify: restart httpd
+
+- name: Create target dir for mod_jk
+  file:
+    state: directory
+    dest: /opt/mod_jk
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy over mod_jk installer
+  unarchive:
+    src: tomcat-connectors-1.2.46-src.tar.gz
+    dest: /opt/mod_jk
+
+- name: Copy over mod_jk compile script
+  template:
+    src: install_mod_jk.sh
+    dest: /usr/local/bin/install_mod_jk.sh
+    owner: root
+    group: root
+    mode: 0750
+
+- name: Compile mod_jk
+  command: /usr/local/bin/install_mod_jk.sh
+
+- name: Allow httpd to make outbound network requests with mod_proxy
+  shell: /usr/sbin/setsebool -P httpd_can_network_connect 1
