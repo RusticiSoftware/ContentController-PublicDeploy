@@ -1,0 +1,64 @@
+---
+- name: Stop NGINX if it is running
+  service: name=nginx state=stopped
+  ignore_errors: true
+
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Define packages to install
+  set_fact:
+    apache_packages: "{{ __apache_packages | list }}"
+  when: apache_packages is not defined
+
+- include_tasks: "setup-{{ ansible_os_family }}.yml"
+
+- name: Ensure that libapache2-mod-jk directory exists
+  file:
+    state: directory
+    path: /etc/libapache2-mod-jk
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Install config files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - { src: "max_clients.conf.j2", dest: "{{ apache_conf_path }}/max_clients.conf" }
+    - { src: "security.conf.j2", dest: "{{ apache_conf_path }}/security.conf" }
+    - { src: "jk.conf.j2", dest: "{{ apache_mods_path }}/jk.conf" }
+    - { src: "mpm_prefork.conf.j2", dest: "{{ apache_mods_path }}/mpm_prefork.conf" }
+    - { src: "ssl.conf.j2", dest: "{{ apache_mods_path }}/ssl.conf" }
+    - { src: "workers.properties.j2", dest: "/etc/libapache2-mod-jk/workers.properties" }
+  notify: restart httpd
+
+- name: Install HTTP VirtualHost config file
+  template:
+    src: 000-default.conf.j2
+    dest: "{{ apache_sites_path }}/000-default.conf"
+  notify: restart httpd
+
+- name: Install HTTPS VirtualHost config file
+  template:
+    src: 000-default-ssl.conf.j2
+    dest: "{{ apache_sites_path }}/000-default-ssl.conf"
+  notify: restart httpd
+  when: use_ssl
+
+- include_tasks: "configure-{{ ansible_os_family }}.yml"
+
+- name: Install robots.txt
+  template:
+    src: robots.txt
+    dest: "{{ html_path }}/robots.txt"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Ensure Apache has been started and is enabled on boot
+  service:
+    name: "{{ apache_service }}"
+    state: started
+    enabled: yes
