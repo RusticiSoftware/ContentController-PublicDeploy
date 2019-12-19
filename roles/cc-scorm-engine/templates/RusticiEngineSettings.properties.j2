@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+  <!-- Integration Class -->
+  <entry key="LogicIntegrationClassName">com.rusticisoftware.contentcontroller.engine.integration.ContentControllerIntegration</entry>
+
+  <entry key="SystemDatabaseConnectionString">{{ database_connection_string }}</entry>
+
+  <entry key="DataPersistenceEngine">plugin</entry>
+  <entry key="DataHelperClassName">com.rusticisoftware.contentcontroller.engine.ContentControllerDataHelper</entry>
+  <entry key="DataHelperAssemblyName">ignored</entry>
+
+  <entry key="ApiEnableV1">true</entry>
+  <entry key="ApiPostbackDataModelVersion">v1</entry>
+  <entry key="ApiRollupRegistrationPostBackUrl">http://localhost:8989/api/engine/results</entry>
+  <entry key="ApiRollupRegistrationFormat">full</entry>
+  <entry key="ApiRollupRegistrationAuthUser">{{ engine_user }}</entry>
+  <entry key="ApiRollupRegistrationAuthPassword">{{ engine_password }}</entry>
+  <entry key="ApiRollupRegistrationSynchronous">false</entry>
+  <entry key="ApiRegistrationCreationPostBackUrl">http://localhost:8989/api/engine/registration</entry>
+  <entry key="ApiLaunchPostBackUrl">http://localhost:8989/api/engine/launch</entry>
+  <entry key="ApiConfigurationSystemTenantName">system</entry>
+
+  <entry key="ScormEngineUrl">/ScormEngineInterface</entry>
+  <entry key="RedirectOnExitUrl">/ScormEngineInterface/exit.html</entry>
+  <entry key="ScormEngineScriptsUrl">/ScormEngineInterface/scripts</entry>
+
+  <entry key="RedirectOnExitUrl">/ScormEngineInterface/exit.html</entry>
+  <entry key="ScormEngineScriptsUrl">/ScormEngineInterface/scripts</entry>
+  <entry key="UseCompressedJavascript">True</entry> <!-- If false, appends _src to scripts URL -->
+
+  <entry key="WebPathToContentRoot">/courses</entry>
+  <entry key="FilePathToContentRoot">{{ courses_filepath }}</entry>
+  <entry key="FilePathToUploadedZippedPackage">{{ uploads_filepath }}</entry>
+  <entry key="HashContentFilesForActivityId">false</entry>
+
+  <entry key="CreateRegistrationIfNeeded">True</entry>
+
+  <entry key="WhenToRestartRegistration">2</entry>
+  <entry key="IsPackageVersioningEnabled">true</entry>
+
+  <entry key="TinCanEnabled">true</entry>
+  <entry key="2004Enabled">true</entry>
+  <entry key="SSPEnabled">true</entry>
+  <entry key="SSPSizeAllocation">1048576</entry>
+
+  <entry key="ScormEngineFilesystemRoot">{{ tomcat_base }}/webapps/ScormEngineInterface</entry>
+
+  <entry key="xAPIUrlPrefix">TCAPI</entry>
+  <entry key="xAPIFilesPath">{{ content_root }}/xapi/</entry>
+  {% if S3ObjectStorageEnabled is defined and S3ObjectStorageEnabled %}
+  <!-- S3StreamingFileStore -->
+  <entry key="xAPIFacilitiesFactoryAssemblyName">ignored</entry>
+  <entry key="xAPIFacilitiesFactoryClassName">com.rusticisoftware.contentcontroller.engine.ContentControllerTinCanFacilitiesFactory</entry>
+  <entry key="AwsSecretId">{{ S3FileStorageAwsId }}</entry>
+  <entry key="AwsSecretKey">{{ S3FileStorageAwsKey }}</entry>
+  <entry key="S3RegionName">{{ S3FileStorageRegion }}</entry>
+  <entry key="S3BucketName">{{ S3FileStorageBucket }}</entry>
+  <!-- End S3StreamingFileStore -->
+  {% endif %}
+
+  <entry key="DispatchBaseUrl">https://{{ServerName}}/ScormEngineInterface/dispatch</entry>
+
+  {% if PlayerFramesetAlways is defined and PlayerFramesetAlways %}
+  <entry key="PlayerLaunchType">FRAMESET</entry>
+  <entry key="PlayerScoLaunchType">FRAMESET</entry>
+  {% endif %}
+  <entry key="ForceFramesetUserAgentRegex">iPhone|Android|Windows Phone|Mobile|OperaMini|Tablet|iPad</entry>
+  <entry key="ForceFramesetByRegex">false</entry>
+
+  {% if PreserveRunTimeData is defined and PreserveRunTimeData %}
+  <entry key="PlayerResetRunTimeData">NEVER</entry>
+  {% endif %}
+
+  <entry key="StoreRuntimeDataAsLob">{{ engine_store_runtime_data_as_lob }}</entry>
+
+  <entry key="SuppressNavbarWhenForcedFrameset">True</entry>
+  <entry key="UseModernPlayer">{{ engine_use_modern_player }}</entry>
+  <entry key="ModernPlayerCustomizationStylesheetUrl">/api/assets/css/cc-player.min.css?build_version={{ build_name.split('-')[1] }}</entry>
+
+  <entry key="KeepSoapLog">True</entry>
+  <entry key="DebugControlAudit">True</entry>
+  <entry key="DebugControlDetailed">True</entry>
+  <entry key="DebugRteAudit">True</entry>
+  <entry key="DebugRteDetailed">True</entry>
+  <entry key="DebugSequencingAudit">True</entry>
+  <entry key="DebugSequencingDetailed">True</entry>
+  <entry key="DebugSequencingSimple">True</entry>
+  <entry key="DebugLookAheadAudit">True</entry>
+  <entry key="DebugLookAheadDetailed">False</entry>
+  <entry key="DebugIncludeTimestamps">True</entry>
+
+  <entry key="UseCrossDomainWebServices">False</entry>
+  <entry key="WebServiceRetries">1</entry>
+  <entry key="WebServiceRetryInterval">3000</entry>
+
+  <entry key="UseImportWebServices">False</entry>
+
+  <entry key="UseGuidAsObjectId">False</entry>
+
+  <entry key="Pens_Process_Sync">True</entry>
+
+  <entry key="DefaultCommCommitFrequency">{{ DefaultCommCommitFrequency }}</entry>
+
+  <!-- Central/Remote URL Configuration
+  In addition to the ScormEngineUrl, the "central" SCORM Engine instance will need the following parameter explicitly defined
+  (or overridden in integration):
+
+  <entry key="RemoteLaunchPageUrl">https://remotescorm.mycompany.com/ScormEngineInterface/defaultui/</entry>
+
+  In addition to the ScormEngineUrl, the "remote" SCORM Engine instance will need these settings ecplicitly defined:
+
+  <entry key="CentralAiccRequestProcessorUrl">https://centralscorm.mycompany.com/ScormEngineInterface/ProcessAiccRequest.jsp</entry>
+  <entry key="CentralWebServiceUrl">https://centralscorm.mycompany.com/ScormEngineInterface/services/ScormEngineDataExchangeService</entry>
+  -->
+
+  <!--
+  If you elect to use custom ui files (deliver page, etc), you will need to define this parameter explicitly, for example:
+
+  <entry key="RemoteLaunchPageUrl">/MyWebApplication/customui/launch.jsp</entry>
+
+  <entry key="EngineUtilsHelperUrl">https://centralscorm.mycompany.com/ScormEngineInterface/EngineUtilsHelper.jsp</entry>
+
+  Also requires the ScormEngineScriptsUrl setting above.
+  -->
+
+  <!--
+  Optional URL the application should redirect to when the learner refreshes the deliver page, which otherwise may result in a the content being
+  re-launched. This can happen when the user deliberately refreshes the page, or uses the back button (except in IE where the back button just
+  shows the existing page from cache and does not reload from the server, or re-run scripts)
+
+  Re-launch is a problem if the content was not suspended, as a new attempt will be generated which will not have all the details from the prior attempt
+  (the prior attempt will still be shown in history).  So even though the user may have completed the initial attempt, they may appear to be incomplete.
+
+  This is an unusual problem, and frequently re-launching after a refresh is the best choice, so for now we only recommend assinging a value to this property
+  if you have run into the problem described above.  The redirect page should minimally make it clear to the user how to get back into the
+  content.
+  -->
+  <entry key="RedirectOnRefreshUrl"></entry>
+
+  <entry key="DBMaxStringLength">2500000</entry>
+
+  <!-- <entry key="DBRetryCount">3</entry> -->
+  <entry key="SupportPackagerSendKey"></entry>
+
+  <entry key="SystemHomepageUrl">https://{{ ServerName }}</entry>
+
+  <entry key="TinCanEnablePublicEndpoint">false</entry>
+
+  <entry key="TinCanAllowMultipleSimultaneousActorIds">False</entry>
+  <entry key="ConvertTinCanVersion">1.0.0</entry>
+  <entry key="ConvertTinCanFromScormRealtime">{{enable_statement_conversion}}</entry>
+  <entry key="ConvertTinCanFromScormHistorical">False</entry>
+
+  <!-- For tincan content to be accesible via the /content endpoint you should choose an option and implement the relevant integration method  -->
+  <!--<entry key="TinCanContentProtectedUseAuthTokenRedirect">False</entry>-->
+  <!--<entry key="TinCanContentProtectedUseBasicAuthForward">False</entry>-->
+  <!--<entry key="TinCanContentProtectedUseCustomProxyAuth">False</entry>-->
+
+  <!--
+       Tin Can forwarding thread configuration elements.
+
+       *TinCanStatementForwardEnabled - enable tin can statement forward on this server.
+       *TinCanStatementForwardSleepTime - sleep time in milliseconds. Describes how frequently to wake up and poll. 1000ms * 60seconds = 60000
+          to poll every minute.
+       *TinCanStatementForwardMaxBackoffHours - max backoff time in hours. Describes the maximum time to wait for a retry of a failing
+          forwarding path. 0 for "no maximum."
+       *TinCanStatementForwardStmtBatchSize - batch size for gathering/posting statements.
+       *TinCanStatementForwardWebTimeout - timeout (in milliseconds) for the http requests for gathering/posting statements
+  -->
+  <entry key="TinCanStatementForwardEnabled">True</entry>
+  <entry key="TinCanStatementForwardSleepTime">60000</entry>
+  <entry key="TinCanStatementForwardMaxBackoffHours">24</entry>
+  <entry key="TinCanStatementForwardStmtBatchSize">500</entry>
+  <entry key="TinCanStatementForwardWebTimeout">{{ xapi_forwarding_timeout }}</entry>
+
+  <!-- Contains the defaults listed in Engine's Defaults.json, minus NoUnexpectedParameters.
+       This parameter was causing TinCan Golf to fail because of an extra parameter -->
+  <entry key="xAPIOptionalValidations">AttachmentContentTransferEncoding, SignatureContentType, IdenticalDocumentsCanConflict, StatementSchemaValidation, NewDocumentsRequireETag</entry>
+
+  <!-- TinCanDataCabinet, an asynchronous TinCan-results collating thread, enabled.
+       Sleeptime is in milliseconds. 60 seconds * 1000ms = 1 minute. -->
+
+  <entry key="TinCanDataCabinetEnabled">False</entry>
+  <entry key="TinCanDataCabinetSleeptime">60000</entry>
+
+  <!-- For multitenant configurations, how many minutes before checking for new tenants
+       Set to "0" for single tenant configurations. -->
+  <!--<entry key="TinCanDataCabinetMinimumMinutesBetweenTenantUpdates">5</entry>-->
+
+  <entry key="TinCanRecipesConfigurationFilePath">{{ tomcat_base }}/webapps/ScormEngineInterface/recipes.json</entry>
+
+  <!-- Format for Accounts is username : password : privilege -->
+  <entry key="TinCanBasicAccounts">
+        {{ engine_user }} : {{ engine_password }} : read-only
+        {{ engine_user }} : {{ engine_password }} : root
+  </entry>
+
+  <entry key="ApiBasicAccounts">
+    {{ engine_user }} : {{ engine_password }} : root
+  </entry>
+
+  <!--
+      When requesting authorization of restricted resources in a typical
+      OAuth handshake (which is optionally part of Tin Can authorization),
+      where is the authorization page?
+  -->
+  <!--<entry key="OAuthAuthorizePage">/ScormEngineInterface/defaultui/oauth_authorize.jsp</entry> -->
+
+  <!--
+  When fetching hosted Tin Can metadata, what URL patterns should we exclude?
+  List values must be valid regular expression patterns, and should be
+  separated by either commas or newlines.
+  (note: example.com and example.org are always excluded)
+  -->
+  <!--<entry key="TinCanHostedMetadataExcludes">
+      https://example.com.*
+      https://example.org.*
+  </entry>-->
+
+  <!--
+  What is the max number of records to return in a statement query?
+  Also used when no limit is specified, or if limit = 0
+  Defaults to 500.
+  -->
+  <!--<entry key="TinCanMaxQueryLimit">500</entry>-->
+
+  <entry key="OfflineExporterFileTypeExclusions"></entry>
+
+</properties>

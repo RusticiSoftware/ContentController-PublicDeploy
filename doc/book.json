@@ -1,0 +1,11 @@
+{
+  "gitbook": "3.x.x",
+  "title": "Content Controller Self-Hosting Documentation",
+  "structure": {
+    "readme": "CCOverview.md"
+  },
+  "plugins": ["-sharing", "-fontsettings", "page-toc", "hide-published-with", "replace-with-index-html"],
+  "styles": {
+    "website": "css/website.css"
+  }
+}
