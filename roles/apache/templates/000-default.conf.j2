@@ -1,0 +1,183 @@
+{% if use_ssl and not allow_80 %}
+
+<VirtualHost *:80>
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI}
+</VirtualHost>
+
+{% elif allow_80 %}
+
+<VirtualHost *:80>
+
+    ServerName {{ ServerName }}
+    ServerAdmin {{ ServerAdmin }}
+    {% if ServerAliases is defined %}
+    {% for alias in ServerAliases %}
+    ServerAlias {{ alias }}
+    {% endfor %}
+    {% endif %}
+    ServerSignature Off
+    Options -Indexes
+
+    Header set X-XSS-Protection: "1; mode=block"
+
+    # IE won't let us set cookies without this.
+    Header set P3P 'CP="NOI"'
+
+    RewriteEngine on
+
+    {% if ServerAliases is defined %}
+    # Rewrite all URLS to point at the primary
+    {% for alias in ServerAliases %}
+    RewriteCond "%{HTTP_HOST}"   "{{ alias }}" [NC]
+    RewriteRule "^/?$"        "https://{{ ServerName }}/$1" [L,R,NE]
+    {% endfor %}
+    {% endif %}
+
+{% if apache_force_non_lms_https %}
+    # Force HTTPS for UI access - HTTP is only for learners from non HTTPS LMS and healthchecks
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteCond "%{REQUEST_URI}" !^/(ScormEngineInterface|RusticiEngine|healthcheck|ping|courses|api/(launch|sdxd))
+    RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=302,L]
+
+    {% if use_hsts %}
+    SetEnvIf X-Forwarded-Proto "https" HTTPS_PROXY=TRUE
+    Header add Strict-Transport-Security "max-age={{ hsts_max_age }}" env=HTTPS_PROXY
+    {% endif %}
+{% endif %}
+
+    #Block access to .git directories
+    RewriteRule ^(.*\/)?\.git - [R=404,L]
+
+    RewriteRule \.ini$ - [R=404,L]
+
+    ##Set max header size to 16Kb
+    ##raise limit to 16Kb to support large cookies created by lectora courses
+    LimitRequestFieldSize 16384
+
+    SetEnvIf Request_URI "^/ScormEngineInterface/dispatch/.*\.(js|html)$" OVERRIDE_DISPATCH_CACHE_HEADERS=TRUE
+    Header add 'Cache-Control' 'no-cache, must-revalidate' env=OVERRIDE_DISPATCH_CACHE_HEADERS
+
+    SetEnvIf Request_URI "^(/(#/.*)?)?$" SET_X-FRAME_HEADER=TRUE
+    Header add 'X-Frame-Options' 'deny' env=SET_X-FRAME_HEADER
+
+    JkMount /ScormEngineInterface/* ajp13_worker
+
+    ProxyPreserveHost On
+
+{% if content_proxy_enabled %}
+
+    ProxyPass /courses/ http://localhost:8090/courses/
+    ProxyPassReverse /courses http://localhost:8090/courses/
+
+{% endif %}
+
+    ProxyPass /api/ http://localhost:8989/api/
+    ProxyPassReverse /api http://localhost:8989/api/
+
+    <Location "/api/">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+    {% if ansible_os_family == 'Debian' %}
+        Header setIfEmpty 'Cache-Control' 'no-cache, no-store, must-revalidate'
+        Header setIfEmpty 'Expires' 0
+    {% else %}
+        Header add 'Cache-Control' 'no-cache, no-store, must-revalidate'
+        Header add 'Expires' 0
+    {% endif %}
+
+        # We don't want to add the Pragma header on this endpoint because we want it to be cached by CloudFront
+        SetEnvIf Request_URI /api/launch/contentvault/verify/ verify
+        Header always add 'Pragma' 'no-cache' env=!verify
+    </Location>
+
+    ProxyPass /healthcheck http://localhost:8981/healthcheck
+    ProxyPassReverse /healthcheck http://localhost:8981/healthcheck
+
+    <Location "/healthcheck">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        Header add 'Cache-Control' 'no-cache, no-store, must-revalidate'
+        Header add 'Pragma' 'no-cache'
+        Header add 'Expires' 0
+    </Location>
+
+    ProxyPass /ping http://localhost:8981/ping
+    ProxyPassReverse /ping http://localhost:8981/ping
+
+    <Location "/ping">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        Header add 'Cache-Control' 'no-cache, no-store, must-revalidate'
+        Header add 'Pragma' 'no-cache'
+        Header add 'Expires' 0
+        RequestHeader set  X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+
+    <Location "/ScormEngineInterface/">
+        # Manually set header because the Tomcat CORS filter won't let us use it with Access-Control-Allow-Origin: *
+        Header set Access-Control-Allow-Credentials: "true"
+    </Location>
+
+    {% if env == 'dev' %}
+    ProxyPass /minio http://localhost:9000/minio
+    ProxyPassReverse /minio http://localhost:9000/minio
+
+    <Location "/minio">
+        Order allow,deny
+        Allow from all
+        Header add 'Access-Control-Allow-Origin' '*'
+        Header add 'Access-Control-Allow-Credentials' 'true'
+        Header add 'Access-Control-Allow-Methods' 'GET'
+        Header add 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization'
+        RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+    </Location>
+    {% endif %}
+
+    DocumentRoot {{ html_path }}
+
+    <Directory {{ html_path }}>
+        Options FollowSymLinks MultiViews
+        AllowOverride None
+        Order allow,deny
+        allow from all
+
+        <FilesMatch "\.(htm|html)$">
+            ExpiresActive On
+            ExpiresDefault A1
+            Header append Cache-Control must-revalidate
+{% if set_ie_compatability_mode_header %}
+            Header append X-UA-Compatible IE=edge
+{% endif %}
+        </FilesMatch>
+
+    </Directory>
+
+    ErrorLog {{ apache_logs }}/error.log
+
+    # Possible values include: debug, info, notice, warn, error, crit,
+    # alert, emerg.
+    LogLevel warn
+
+    SetEnvIf REMOTE_ADDR "(.+)" CLIENTIP=$1
+    SetEnvIf X-Forwarded-For "^([0-9.]+)" CLIENTIP=$1
+    LogFormat "%{CLIENTIP}e %l %u %t %D \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" trueip_combined
+
+    CustomLog {{ apache_logs }}/access.log trueip_combined
+
+</VirtualHost>
+
+{% endif %}
