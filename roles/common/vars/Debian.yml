@@ -1,0 +1,5 @@
+---
+common_platform_packages:
+  - vim-nox
+  - mysql-community-client
+  - openssl
