@@ -1,0 +1,46 @@
+enable_statement_conversion: "False"
+
+# engine syslog log level
+# Should be one of the following, listed here in descending verbosity:
+# trace, debug, info, warn, error
+# trace and debug will blow up busy servers
+# and info shouldn't be used on busy production boxes if it's avoidable
+engine_log_level: "info"
+
+# Enabling PlayerFramesetAlways will cause the default configuration for any new content/equivalents to be Frameset/Frameset
+PlayerFramesetAlways: false
+
+# Enabling PerserveRunTimeData will change the default value for the "Reset RunTime Data Timing" course configuration setting
+# to "Never", from the regular default of "When Exit is Not Suspend" for SCORM 2004 content. This means that run-time data
+# will not be reset on subsequent launches after a non-suspend exit. This setting can be overridden on a per-course basis
+# from the course's Test & Configure page.
+PreserveRunTimeData: false
+
+# By default, the engine upgrade migrations don't run.
+# specify this at build time if they need to run.
+engine_upgrade: false
+
+engine_use_modern_player: "True"
+
+# Specify a failover parameter.  Options are failover:, sequential:, replication:, aurora:
+# https://mariadb.com/kb/en/library/failover-and-high-availability-with-mariadb-connector-j/
+# It should include the end colon, please
+engine_db_failover_parameter: ""
+
+# Set the query used to validate a DB connection.  A good reason for changing this would be to check if a connection
+# is read only.  Example:
+#   SELECT content_controller_connection_validation();
+engine_db_connnection_initialization_query: "/* ping */ -- Engine Health Check"
+
+# Determines whether runtime data received from player should be stored in a lob column or normalized.
+# Should significantly reduce DB utilization, but isn't great if you're running your own reporting queries
+# against the Engine DB.
+engine_store_runtime_data_as_lob: true
+
+## Prior to 2018 Engine was referred to as ScormEngine, and then the name was later changed to RusticiEngine
+war_name: "{{ 'Scorm' if scorm_engine_war_name == True else 'Rustici' }}"
+
+# Used as the value of TinCanStatementForwardWebTimeout in the Engine config file
+xapi_forwarding_timeout: 10000
+
+always_close_top_on_exit: false
