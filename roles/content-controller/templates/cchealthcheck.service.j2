@@ -1,0 +1,10 @@
+[Unit]
+Description=Content Controller Healthcheck Daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/cc-heathcheck.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
