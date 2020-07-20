@@ -1,0 +1,42 @@
+- name: make installation directory
+  file:
+    path: "{{ content_proxy_installation_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: download content proxy release
+  aws_s3:
+    bucket: "rustici-release-content-proxy"
+    object: "content-proxy-{{ content_proxy_release }}-all.jar"
+    dest: "{{ content_proxy_installation_dir }}/content-proxy-{{ content_proxy_release }}.jar"
+    mode: get
+    aws_access_key: "{{ s3_download_key }}"
+    aws_secret_key: "{{ s3_download_secret }}"
+    region: us-east-1
+  notify: restart content proxy
+
+- name: install systemd service file
+  template:
+    src: content-proxy.service.j2
+    dest: /etc/systemd/system/content-proxy.service
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart content proxy
+
+- name: install environment variable config file
+  template:
+    src: environment-variables.j2
+    dest: "{{ content_proxy_installation_dir }}/environment-variables"
+    owner: root
+    group: root
+    mode: 0600 # contains secrets
+  notify: restart content proxy
+
+- name: start, enable content proxy
+  systemd:
+    service: content-proxy
+    state: started
+    enabled: yes
