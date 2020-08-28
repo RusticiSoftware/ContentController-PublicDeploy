@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Context useRelativeRedirects="true">
+    <WatchedResource>WEB-INF/web.xml</WatchedResource>
+
+    <Resource name="jdbc/{{ engine_db_name }}" auth="Container"
+              factory="com.zaxxer.hikari.HikariJNDIFactory"
+              type="javax.sql.DataSource"
+              description="MySQL database for ScormEngine"
+              driverClassName="org.mariadb.jdbc.Driver"
+
+              minimumIdle="5"
+              maximumPoolSize="32"
+              connectionTimeout="45000"
+              connectionInitSql="{{ engine_db_connnection_initialization_query }}"
+
+              username="{{ engine_db_username }}"
+              password="{{ engine_db_password }}"
+              jdbcUrl="{{ engine_db_url }}"
+
+              dataSource.cachePrepStmts="true"
+              dataSource.prepStmtCacheSize="250"
+              dataSource.prepStmtCacheSqlLimit="2048"
+              dataSource.useServerPrepStmts="true"
+              dataSource.useLocalSessionState="true"
+              dataSource.useLocalTransactionState="true"
+              dataSource.rewriteBatchedStatements="true"
+              dataSource.cacheResultSetMetadata="true"
+              dataSource.cacheServerConfiguration="true"
+              dataSource.elideSetAutoCommits="true"
+              dataSource.maintainTimeStats="false"
+            />
+</Context>
