@@ -1,0 +1,18 @@
+---
+common_packages:
+  - curl
+  - ntp
+  - git
+  - cloud-utils
+  - unzip
+  - kpartx
+  - gdisk
+  - libtool
+  - logwatch
+  - ntp
+  - python-pip
+  - postfix
+  - xfsprogs
+  - zip
+  - wget
+  - nano
