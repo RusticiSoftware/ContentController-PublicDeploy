@@ -1,0 +1,15 @@
+{
+  "name": "contentcontroller-hostingdocs",
+  "version": "2.1.0",
+  "private": true,
+  "dependencies": {
+    "gitbook-cli": "^2.3.0",
+    "gitbook-plugin-hide-published-with": "^1.0.3",
+    "gitbook-plugin-page-toc": "^1.1.0",
+    "gitbook-plugin-replace-with-index-html": "^1.0.9"
+  },
+  "scripts": {
+    "gb-install": "gitbook install",
+    "build": "gitbook build . dist"
+  }
+}

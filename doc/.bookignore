@@ -1,0 +1,7 @@
+package.json
+package-lock.json
+*.js
+.*.swp
+.gitignore
+generate
+readme.md
