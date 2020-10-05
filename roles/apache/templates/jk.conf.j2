@@ -1,0 +1,13 @@
+{% if ansible_os_family == 'RedHat' %}
+LoadModule jk_module "{{ apache_server_root }}/modules/mod_jk.so"
+JkShmFile	/var/run/httpd/mod_jk.shm
+{% endif %}
+
+JkWorkersFile /etc/libapache2-mod-jk/workers.properties
+JkLogFile {{ apache_logs }}/mod_jk.log
+JkLogLevel info
+JkLogStampFormat "[%a %b %d %H:%M:%S %Y] "
+JkOptions +ForwardKeySize +ForwardURICompat -ForwardDirectories
+JkRequestLogFormat "%w %V %T"
+
+JkAutoAlias {{ tomcat_base }}
