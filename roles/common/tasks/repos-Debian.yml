@@ -1,0 +1,43 @@
+---
+- name: Use local apt cache if desired
+  template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf
+  when: use_local_apt_cache
+
+- name: Remove local apt cache if disabled
+  file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+  when: not use_local_apt_cache
+
+# Expires 02/17/2019
+- name: Copy apt release signing key for MySQL
+  copy:
+    src: "mysql-releases.key"
+    dest: "/tmp/mysql-releases.key"
+    mode: 0600
+    force: true
+
+- name: Add apt release signing key for MySQL
+  apt_key:
+    file: "/tmp/mysql-releases.key"
+    state: present
+
+- name: Cleanup MySQL 5.6 dependencies
+  package: name="mysql-utilities" state=absent
+
+- name: Fetch MySQL apt repo config tool
+  get_url:
+    url: "http://dev.mysql.com/get/mysql-apt-config_0.8.9-1_all.deb"
+    dest: "/tmp/mysql-apt-config_0.8.9-1_all.deb"
+    mode: 0750
+
+- name: Specify MySQL tool version to use
+  command: echo mysql-apt-config mysql-apt-config/enable-repo select mysql-5.7 | sudo debconf-set-selections
+
+- name: Install MySQL apt repo
+  shell: DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/mysql-apt-config_0.8.9-1_all.deb
+
+- name: Update apt cache to pull in MySQL repo contents
+  apt: update_cache=yes
+
+- name: Run aptitude safe-upgrade
+  apt: upgrade=safe
+  when: not noupgrade
