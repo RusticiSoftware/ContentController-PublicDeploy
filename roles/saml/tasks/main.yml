@@ -1,0 +1,16 @@
+---
+- name: Copy SAML keystore
+  copy:
+      src: "samlKeystore.jks"
+      dest: "{{data_root}}/samlKeystore.jks"
+      owner: tomcat
+      group: tomcat
+      mode: 0640
+
+- name: Copy SAML Identity Provider metadata
+  copy:
+      src: "idp-metadata.xml"
+      dest: "{{data_root}}/idp-metadata.xml"
+      owner: tomcat
+      group: tomcat
+      mode: 0640
