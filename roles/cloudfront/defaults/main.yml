@@ -1,0 +1,26 @@
+---
+
+# Enable the things.  Note that if you aren't also using S3 for file storage,
+# CloudFront isn't going to do anything useful for you
+use_cloudfront: false
+
+# You'll use the access key ID when you create signed URLs or signed cookies.
+cloudfront_access_key_id: 
+
+# Distribution Domain - the domain name of your CloudFront distribution
+# This should always be the same as {{ ServerName }}, and we're only adding it here
+# to be really explicit and stupidly verbose.
+cloudfront_distro_domain: "{{ ServerName }}"
+
+# Generate your keys via this process:  
+# http://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html
+# You'll need to run openssl pkcs8 -topk8 -nocrypt -in privatekey.pem  -inform PEM -out privatekey.der  -outform DER
+# against your private key to make it work with Java.
+# Place your private key and public key in "roles/cloudfront/files"
+cloudfront_private_key: privatekey.der
+cloudfront_public_key: rsa-publickey.pem
+
+# NOTE: If you think you need a local content proxy, please contact
+# Rustici Software support for more information. We'll need to grant
+# you access to the release bucket.
+content_proxy_enabled: false

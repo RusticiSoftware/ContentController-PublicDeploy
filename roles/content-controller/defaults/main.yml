@@ -1,0 +1,92 @@
+---
+
+#In order to download releases of Content Controller, you'll need to have a keypair
+#(The folks at Rustici will provide you with a keypair to use)
+s3_download_key:
+s3_download_secret:
+use_s3_release: false
+
+# This stuff is only here for when we're doing internal builds.
+# The download won't work outside of our internal network, anyway.
+# But if you want to break a bunch of stuff, be my guest :-)
+use_art: false
+art_url: http://artifactory.rusticisoftware.com/artifactory/cc-snapshot-local/zips/contentcontroller-snapshot.zip
+use_minio: false
+
+# This should match the name of the build that you have in roles/content-controller/files (if deploying locally)
+build_name: ContentController-3.0.294
+
+# These settings provision the initial user for the Content Controller web interface.
+cc_username: 'test.user@example.com'
+cc_user_full_name: 'Test User'
+cc_user_password: 'test^passWord12'
+cc_user_email: 'test.user@example.com'
+
+# Run DB migrations (these should only be run from one box during a multi-box deploy)
+cc_run_db_migrations: true
+
+# Escalate rights for ContentController database user when running migrations
+escalate: true
+
+# Specify a failover parameter.  Options are failover:, sequential:, replication:, aurora:
+# https://mariadb.com/kb/en/library/failover-and-high-availability-with-mariadb-connector-j/
+# It should include the end colon, please
+cc_db_failover_parameter: ""
+
+# Set the query used to validate a DB connection.  A good reason for changing this would be to check if a connection
+# is read only.  Example:
+#   INSERT INTO `object_store` (object_key_sha1, object_key)
+#     VALUES (unhex('ad522e07a0ee37459059aa16eb6a45d000827a32'), 'contentcontroller/healthcheck')
+#     ON DUPLICATE KEY UPDATE update_dt = now();
+cc_db_connection_initialization_query: "/* ping */ -- Content Controller Health Check"
+
+# Define connection pool sizes (these can usually be left at their default values)
+cc_db_pool_min_size: 8
+cc_db_pool_max_size: 32
+cc_db_pool_initial_size: 10  # Initial size must be greater than, or equal to `minSize`
+
+# Send metrics data to Datadog.
+use_datadog: false
+
+# prevent user data from being exposed in the UI.
+# Note that this is a string value, not a boolean, as fills in a string in the contentcontroller.yml template file.
+sanitizeLearnerInfo: "false"
+
+# The The maximum idle time for a connection, once established.  Append "ms" to the value
+jerseyClientTimeout: 5000ms
+# The maximum time to wait for a connection to open.
+jerseyClientConnectionTimeout: 2000ms
+
+# The number of background threads to use for import jobs.
+import_threads: 10
+
+# Enable remote JVM debugging for the contentcontroller-service application.
+remote_debugging: false
+
+# Defined, but null by default
+ssl_chain:
+
+# The expiration time for auth tokens in minutes. The minimum value is 1
+# minute, the maximum value is 43200 minutes (30 days), and the default
+# is 1440 minutes (1 day).
+token_exp: 1440
+
+generated_file_location: "{{ data_root }}/reports"
+generated_file_webpath: /reports
+
+generated_course_zip_location: "{{ content_root }}/zips"
+generated_course_zip_webpath: /zips
+
+daysToKeepExportedVersionZips: 90
+
+# Public Automation API (disabled by default)
+enable_automation_api: false
+
+# Enable emails (disabled by default)
+enable_emails: false
+
+# S3 Defaults
+cc_s3_http_port: 80
+cc_s3_https_port: 443
+cc_s3_https_only: true
+cc_s3_disable_dns_buckets: false

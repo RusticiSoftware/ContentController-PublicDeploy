@@ -1,0 +1,90 @@
+---
+  - name: add group "tomcat"
+    group: name=tomcat
+
+  - name: add user "tomcat"
+    user: name=tomcat group=tomcat home={{ tomcat_base }} createhome=no
+    become: true
+
+  - name: Download Tomcat
+    get_url: url=http://archive.apache.org/dist/tomcat/tomcat-7/v7.0.100/bin/apache-tomcat-7.0.100.tar.gz dest=/opt/apache-tomcat-7.0.100.tar.gz
+
+  - name: Extract archive
+    command: chdir=/usr/share /bin/tar xvf /opt/apache-tomcat-7.0.100.tar.gz -C /opt/ creates=/opt/apache-tomcat-7.0.100
+
+  - name: set name of tomcat directory
+    set_fact: tomcat_dir="/opt/apache-tomcat-7.0.100"
+
+  - name: Symlink install directory
+    file: src=/opt/apache-tomcat-7.0.100 path="{{ tomcat_base }}" state=link
+
+  - name: Change ownership of Tomcat installation
+    file: path=/opt/apache-tomcat-7.0.100 owner=tomcat group=tomcat state=directory recurse=yes
+
+  - name: Set ownership of s3temp directory
+    file: path="{{ S3FileStorageTempDir }}" state=directory owner=tomcat group=tomcat mode=0755
+    when: S3FileStorageEnabled
+
+  - name: Create lib directory
+    file: path={{ tomcat_base }}/lib state=directory mode=0750 owner=tomcat group=tomcat
+
+  - name: Configure Tomcat server
+    template: src=server.xml dest={{ tomcat_base }}/conf/
+    notify:
+    - restart tomcat7
+
+  - name: check to see if systemd is enabled
+    shell: "[[ `systemctl` =~ -\\.mount ]] && echo yes || echo no"
+    args:
+      executable: /bin/bash
+    register: tomcat_systemd_check
+
+  - name: check to see if upstart is enabled
+    shell: "[[ `/sbin/init --version` =~ upstart ]] && echo yes || echo no"
+    args:
+      executable: /bin/bash
+    register: tomcat_upstart_check
+
+  - name: set facts for init check
+    set_fact:
+      tomcat_using_upstart: "{{ tomcat_upstart_check.stdout | bool }}"
+      tomcat_using_systemd: "{{ tomcat_systemd_check.stdout | bool }}"
+
+  - name: Install Tomcat upstart script (Debian)
+    template: src=tomcat.conf.j2 dest=/etc/init/tomcat.conf mode=0644
+    when: ansible_os_family == 'Debian' and tomcat_using_upstart
+
+  - name: Install Tomcat systemd script
+    template: src=tomcat.service dest=/etc/systemd/system/tomcat.service
+    when: tomcat_using_systemd
+
+  - name: Enable systemd job
+    systemd: name=tomcat.service enabled=yes daemon_reload=yes
+    when: tomcat_using_systemd
+
+  - name: Install logging.properties
+    action: template src=logging.properties dest={{ tomcat_base }}/conf/logging.properties
+    notify:
+    - restart tomcat7
+
+  - name: install tomcat-jdbc.jar
+    copy: src=tomcat-jdbc-7.0.100.jar dest={{ tomcat_base }}/lib/tomcat-jdbc-7.0.100.jar
+    notify:
+    - restart tomcat7
+
+  - name: cleanup default WebApps
+    file: path="{{ tomcat_base }}/webapps/{{ item.name }}" state=absent
+    with_items:
+      - { name: docs }
+      - { name: examples }
+      - { name: ROOT }
+      - { name: host-manager }
+      - { name: manager }
+    notify:
+    - restart tomcat7
+
+  - name: Install logrotate script
+    template: src=tomcat.logrotate.j2 dest=/etc/logrotate.d/tomcat.logrotate
+
+  - name: Symlink Log directory
+    file: src={{ tomcat_base }}/logs path=/var/log/tomcat state=link
