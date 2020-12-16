@@ -1,0 +1,7 @@
+#!/bin/sh
+npm install
+# gitbook relies on a broken version of graceful-fs.
+# We can use sed to manually remove the lines that cause the issue.
+sed -i.bak -e 's/fs.*stat = statFix.*//g' node_modules/npm/node_modules/graceful-fs/polyfills.js
+npm run gb-install
+npm run build
