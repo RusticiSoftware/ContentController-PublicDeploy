@@ -1,0 +1,115 @@
+---
+- name: Install MySQL Server 5.7
+  yum:
+    name: mysql-community-server
+    state: latest
+  register: mysql_redhat_yum_results
+
+- name: Set default sql_mode
+  lineinfile: dest=/etc/my.cnf regexp="^sql_mode" line='sql_mode = "NO_ENGINE_SUBSTITUTION"'
+  notify: restart mysql
+
+- name: Determine zlib version
+  block:
+  - name: Check existing library
+    raw: ls /usr/lib/libz.so.*.*
+    register: zlib_version
+
+  - name: Recording existing version
+    set_fact:
+      upgrade_zlib: zlib_version.stdout is version('1.2.11', '<')
+  rescue:
+  - name: Recording zlib absence
+    set_fact:
+      upgrade_zlib: true
+
+- name: Update zlib
+  when: upgrade_zlib
+  block:
+  - name: Download zlib-1.2.11
+    get_url:
+      url: https://zlib.net/zlib-1.2.11.tar.gz
+      dest: /tmp
+
+  - name: Extract zlib-1.2.11
+    unarchive:
+      remote_src: yes
+      src: /tmp/zlib-1.2.11.tar.gz
+      dest: /tmp/
+
+    # ./configure saves a log file to ./, so we have to cd into that
+    # directory before running the command
+  - name: Configure zlib-1.2.11
+    raw: (cd /tmp/zlib-1.2.11/ && ./configure --shared --prefix=/usr)
+
+  - name: Build zlib-1.2.11
+    make:
+      chdir: /tmp/zlib-1.2.11/
+
+  - name: Install zlib-1.2.11
+    make:
+      chdir: /tmp/zlib-1.2.11/
+      target: install
+
+  - name: Clean up after zlib installation
+    file:
+      path: /tmp/zlib-1.2.11
+      state: absent
+
+- name: Start MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    state: started
+    enabled: true
+
+- name: Install other packages
+  package: name={{ item }} state=present
+  with_items:
+    - mysql-connector-java
+    - MySQL-python
+
+- name: Check to see if .my.cnf has been written
+  stat: path=/root/.my.cnf
+  register: mysql_my_cnf_exists
+
+- name: Run MySQL upgrade tool
+  shell: mysql_upgrade
+  when: mysql_my_cnf_exists.stat.exists and mysql_redhat_yum_results | changed
+  ignore_errors: true
+
+- name: Get temporary MySQL password on initial install
+  shell: "cat /var/log/mysqld.log | grep 'A temporary password is generated for' | awk '{print $NF}'"
+  args:
+    executable: /bin/bash
+  register: mysql_redhat_initial_root_password_results
+  when: mysql_my_cnf_exists.stat.exists == false and mysql_redhat_yum_results | changed
+
+- name: Set fact for MySQL root password
+  set_fact:
+    mysql_redhat_initial_root_password: "{{ mysql_redhat_initial_root_password_results.stdout }}"
+  when: mysql_redhat_initial_root_password_results | changed
+
+- name: Set initial MySQL root password
+  shell: |
+    # Temp password provided from MySQL logs
+    TEMP_PASS='{{ mysql_redhat_initial_root_password }}'
+
+    # Unexpire root password
+    mysql --connect-expired-password -uroot -p"$TEMP_PASS" -Bse "ALTER USER root@localhost IDENTIFIED BY '$TEMP_PASS';"
+    mysql --connect-expired-password -uroot -p"$TEMP_PASS" -Bse "ALTER USER root@localhost PASSWORD EXPIRE NEVER;"
+
+    # Remove password validation plugin (since we don't have end users connecting to the DB, it isn't needed)
+    mysql -uroot -p"$TEMP_PASS" -Bse "UNINSTALL PLUGIN validate_password;"
+  args:
+    executable: /bin/bash
+  when: mysql_redhat_initial_root_password is defined
+
+- name: Copy .my.cnf file with root password credentials
+  template: src=root.my.cnf.j2 dest=/root/.my.cnf owner=root mode=0600
+  when: mysql_redhat_initial_root_password is defined
+
+- name: Restart MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    state: restarted
+  when: mysql_redhat_initial_root_password is defined
