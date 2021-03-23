@@ -1,0 +1,271 @@
+---
+- name: clean up staging directory
+  shell: "rm -rf {{ temp_path }}"
+
+- name: Set facts for external tasks
+  set_fact:
+    build_name: "{{ build_name }}"
+
+- name: Fetch the Checksum of the latest release of Content Controller from S3
+  aws_s3:
+    bucket="rustici-release-cc"
+    object={{ item.src }}
+    dest={{ item.dest }}
+    mode=get
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  when: not use_art and use_s3_release
+  with_items:
+    - { src: "{{ build_name }}.zip.sha1", dest: "/tmp/{{ build_name }}.zip.sha1" }
+
+- name: Check to see if we already have a copy of the archive in place
+  stat: path="/tmp/{{ build_name }}.zip"
+  register: build
+
+- name: Fetch contents of downloaded checksum to compare to current build checksum
+  command: "cat /tmp/{{ build_name }}.zip.sha1"
+  register: checksum
+  when: not use_art and use_s3_release
+
+- name: check the checksum
+  command: /bin/true
+  when: (not use_art and use_s3_release) and build.stat.exists and (build.stat.checksum == checksum.stdout)
+  register: filesequal
+  ignore_errors: true
+
+- name: copy over contentcontroller archive
+  copy: src="{{ build_name }}.zip" dest="/tmp/{{ build_name }}.zip" mode=0700 force=true
+  when: not use_art and not use_s3_release
+  register: ccupdated
+
+- name: Fetch a fresh build of Content Controller if you're doing something special
+  get_url: url="{{ art_url }}" dest="/tmp/{{ build_name }}.zip" mode=0700
+  when: use_art and not use_s3_release
+  register: ccupdated
+
+- name: Fetch the latest release of Content Controller from S3
+  aws_s3:
+    bucket="rustici-release-cc"
+    object={{ item.src }}
+    dest={{ item.dest }}
+    mode=get
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  when: not use_art and use_s3_release and (not filesequal or not build.stat.exists)
+  with_items:
+    - { src: "{{ build_name }}.zip", dest: "/tmp/{{ build_name }}.zip" }
+    - { src: "{{ build_name }}.zip.sha1", dest: "/tmp/{{ build_name }}.zip.sha1" }
+  register: ccupdated
+
+- name: create path for deployment files
+  file:
+    path: "{{ temp_path }}"
+    state: directory
+
+- name: ensure that path for client files already exists
+  file: path="{{ html_path }}" state=directory mode=0755
+
+- name: symlink courses folder into the html_path
+  file: path="{{ html_path }}courses" src="{{ courses_filepath }}" state=link
+
+- name: symlink courses folder into minio data path
+  file:
+    path: "{{ minio_data_path }}/{{ S3FileStorageBucket }}"
+    src: "{{ content_root }}"
+    state: link
+  when: use_minio
+
+- name: unzip archive on target machine
+  unarchive:
+    src="/tmp/{{ build_name }}.zip"
+    dest="{{ temp_path }}"
+    copy=no
+    force=yes
+
+- name: check if ScormEngineInterface war file exists
+  stat: 
+    path: "{{ temp_path }}/engine/ScormEngineInterface.war"
+  register: scorm_engine_war
+
+- name: Register ScormEngine war name
+  set_fact:
+    scorm_engine_war_name: true
+    rustici_engine_war_name: false
+    cacheable: yes
+  when: scorm_engine_war.stat.exists == True
+
+- name: Register RusticiEngine war name
+  set_fact:
+    rustici_engine_war_name: true
+    scorm_engine_war_name: false
+    cacheable: yes
+  when: scorm_engine_war.stat.exists == False
+
+- name: check if V2 API client exists
+  stat:
+    path: "{{ temp_path }}/service/lib/RusticiSoftware.Core.api.client.v2.jar"
+  register: v2_client
+
+- name: Register V2 client exists
+  set_fact:
+    engine_use_v2_api: true
+    cacheable: yes
+  when: v2_client.stat.exists == True
+
+- name: Register V2 client does not exist
+  set_fact:
+    engine_use_v2_api: false
+    cacheable: yes
+  when: v2_client.stat.exists == False
+
+- name: Create and set permissions on logfile
+  file:
+    path: "/var/log/{{ item }}"
+    state: touch
+    owner: tomcat
+    group: tomcat
+    mode: 0640
+  with_items:
+    - contentcontroller.log
+    - contentcontroller-audit.log
+
+- name: Creates cc_deploy_path directory
+  file: path={{ cc_deploy_path }} state=directory mode=0750 owner=tomcat group=tomcat
+
+- name: Copy service files to cc_deploy_path
+  shell: "cp -rf {{ temp_path }}/service/. {{ cc_deploy_path }}"
+  notify:
+  - restart contentcontroller
+
+- name: Create config file
+  template:
+    src=contentcontroller.yaml.j2
+    dest={{ cc_deploy_path }}/bin/contentcontroller.yaml
+
+- name: escalate rights for ccontroller mysql user to run migrations
+  mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv="{{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,REFERENCES,INDEX,ALTER,CREATE TEMPORARY TABLES,LOCK TABLES,EXECUTE,CREATE VIEW,SHOW VIEW,CREATE ROUTINE,ALTER ROUTINE,TRIGGER" state=present
+  notify: flush privs
+  when: escalate and cc_run_db_migrations
+
+- name: run db migration
+  shell: "cd {{ cc_deploy_path }}/bin; ./contentcontroller-service db migrate --outOfOrder contentcontroller.yaml"
+  when: cc_run_db_migrations
+
+- name: set mysql rights back to minimum required set post migration
+  mysql_user: name="{{ cc_db_username }}" host="%" login_user="{{ mysql_root_user }}" login_password={{ mysql_root_password }} login_host={{ cc_db_host }} password="{{ cc_db_password }}" priv="{{ cc_db_name }}.*:SELECT,INSERT,UPDATE,DELETE,LOCK TABLES,EXECUTE,TRIGGER,CREATE TEMPORARY TABLES" state=present
+  notify: flush privs
+  when: escalate and cc_run_db_migrations
+
+- name: install client files
+  shell: "cp -a {{ temp_path }}/www/. {{ html_path }}"
+  notify:
+  - restart contentcontroller
+
+- name: add initial user
+  shell: cd {{ cc_deploy_path }}/bin; ./contentcontroller-service user contentcontroller.yaml create -u "{{ cc_username }}" -n "{{ cc_user_full_name }}" -p "{{ cc_user_password }}" -e "{{ cc_user_email }}" -r "ADMIN"
+  when: initialize_mysql
+
+- name: check to see if systemd is enabled
+  shell: "[[ `systemctl` =~ -\\.mount ]] && echo yes || echo no"
+  args:
+    executable: /bin/bash
+  register: cc_systemd_check
+
+- name: check to see if upstart is enabled
+  shell: "[[ `/sbin/init --version` =~ upstart ]] && echo yes || echo no"
+  args:
+    executable: /bin/bash
+  register: cc_upstart_check
+
+- name: set facts for init check
+  set_fact:
+    cc_using_upstart: "{{ cc_upstart_check.stdout | bool }}"
+    cc_using_systemd: "{{ cc_systemd_check.stdout | bool }}"
+
+- name: set cchealthcheck restart command
+  set_fact:
+    cc_restart_command: "{{ '/bin/systemd restart contentcontroller' if cc_using_systemd else '/usr/sbin/service contentcontroller restart' }}"
+
+- name: install upstart script (Ubuntu)
+  template:
+    src=contentcontroller.conf.j2
+    dest=/etc/init/contentcontroller.conf
+  notify:
+  - restart contentcontroller
+  when: ansible_os_family == 'Debian' and cc_using_upstart
+
+- name: install systemd init script
+  template:
+    src=contentcontroller.service.j2
+    dest=/etc/systemd/system/contentcontroller.service
+  notify:
+  - start contentcontroller
+  when: cc_using_systemd
+
+- name: install Service Layer healthcheck script
+  template: src=cc-healthcheck.py.j2 dest=/usr/local/bin/cc-healthcheck.py mode=0750 owner=root group=root
+  notify: stop cchealthcheck
+
+- name: install Service Layer healthcheck init script (Upstart)
+  template: src=cc-healthcheck.init.j2 dest=/etc/init.d/cchealthcheck mode=0755 owner=root group=root
+  notify: stop cchealthcheck
+  when: cc_using_upstart
+
+- name: install Service Layer healthcheck systemd service
+  template: src=cchealthcheck.service.j2 dest=/etc/systemd/system/cchealthcheck.service mode=0755 owner=root group=root
+  notify: stop cchealthcheck
+  when: cc_using_systemd
+
+- name: create SDXD directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  with_items:
+    - '/var/www/html/sdxd/SCORMDriverXD_CS'
+    - '/var/www/html/sdxd/remotecontent'
+
+- name: install SDXD files
+  template: src=templates/{{item.src}} dest=/var/www/html/sdxd/{{item.dest}} mode=0664
+  with_items:
+    - {src: 'configuration.js.j2', dest: 'SCORMDriverXD_CS/configuration.js'}
+    - {src: 'contentAPI.html.j2', dest: 'SCORMDriverXD_CS/contentAPI.html'}
+    - {src: 'contentsample.html.j2', dest: 'remotecontent/contentsample.html'}
+  notify:
+  - restart contentcontroller
+
+- name: archive SDXD files for download
+  shell: "rm -f /var/www/html/sdxd/{{item.dest}} && zip -j /var/www/html/sdxd/{{item.dest}} /var/www/html/sdxd/{{item.src}}"
+  with_items:
+    - {src: 'SCORMDriverXD_CS/contentAPI.html', dest: 'SCORMDriverXD_CS/contentAPI.zip'}
+    - {src: 'remotecontent/contentsample.html', dest: 'remotecontent/contentsample.zip'}
+
+- name: Check for RXD
+  stat:
+    path: "{{ html_path }}rxd/"
+  register: rxd
+
+- name: Set RXD host in static files
+  when: rxd.stat.exists == True
+  replace:
+    path: "{{ item }}"
+    regexp: "\\{\\{ServerName\\}\\}"  # Regex matching the literal token
+    replace: "{{ ServerName }}" # Replacing that token with the Ansible variable of the same name
+  with_items:
+    - "{{ html_path }}rxd/contentAPI.html"
+    - "{{ html_path }}rxd/rustici-xd-pkg-api.min.js"
+
+- name: archive RXD files for download
+  shell: "rm -f /var/www/html/rxd/{{item}}.zip && zip -j /var/www/html/rxd/{{item}}.zip /var/www/html/rxd/{{item}}.html"
+  when: rxd.stat.exists == True
+  with_items:
+    - 'contentAPI'
+    - 'sample-course/index'
+
+- name: ensure that service is enabled
+  service: name=contentcontroller enabled=yes state=started
+
+- name: ensure that cchealthcheck daemon is enabled
+  service: name=cchealthcheck enabled=yes state=started
