@@ -1,0 +1,54 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat {{ redhat_version }} variants"
+  copy:
+    src: "epel-release-latest-{{ redhat_version }}.noarch.rpm"
+    dest: "/tmp/epel-release-latest-{{ redhat_version }}.noarch.rpm"
+
+- name: "Install rpm for EPEL Repository for RedHat {{ redhat_version }} variants"
+  yum:
+    name: "/tmp/epel-release-latest-{{ redhat_version }}.noarch.rpm"
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: Disable default MySQL repo (if using RHEL 8)
+  shell: sudo dnf remove -y @mysql && sudo dnf module reset -y mysql && sudo dnf module disable -y mysql
+  when: redhat_version == "8"
+
+- name: Add MySQL 5.7 repository (if using RHEL 8)
+  copy:
+    src: mysql-community.repo
+    dest: /etc/yum.repos.d/mysql-community.repo
+  when: redhat_version == "8"
+
+- name: Disable mysql80 and enable mysql57
+  # Can't use Ansible's built-in yum module because it doesn't support config-manager
+  shell: yum config-manager --enable mysql57-community
+  when: redhat_version == "8"
+
+- name: Fetch MySQL yum repo (if using RHEL 7)
+  get_url:
+    url: "https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm"
+    dest: "/tmp/mysql57-community-release-el7-11.noarch.rpm"
+    mode: 0750
+  when: redhat_version == "7"
+
+- name: Install MySQL 5.7 repo (if using RHEL 7)
+  yum:
+    name: /tmp/mysql57-community-release-el7-11.noarch.rpm
+    state: present
+  when: redhat_version == "7"
+
+- name: Run yum update
+  yum: name=* state=latest
+  when: not noupgrade
+
+- name: Install pip
+  package:
+    name: python-pip
+    state: latest
+    update_cache: yes
+  when: redhat_version == "7"
