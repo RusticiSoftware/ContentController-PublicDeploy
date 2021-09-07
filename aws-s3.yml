@@ -1,0 +1,31 @@
+# This playbook:
+#  - Creates S3 buckets
+#  - Creates an IAM user for CloudFront to have access to the S3 buckets
+#  - Enables S3 filestorage
+#  - Writes the S3 group_vars file
+#
+# Requirements:
+#  - Must be run on a Linux EC2 instance with an attached IAM role (with EC2 permissions)
+#    or boto must be configured with AWS credentials
+#
+# Example Usage:
+#  ansible-playbook aws-s3.yml -e "cloudfront_origin_access_identity=YOURCFORIGINID"
+---
+- hosts: localhost
+  vars_prompt:
+    - name: "S3FileStoragePrefix"
+      prompt: "Please enter a prefix for your S3 bucket's name.  Your company name in a DNS-valid format is a good call here, i.e. 'rustici'"
+      default: "mycompany-cc-bucket"
+      private: no
+
+    - name: "S3AWSAccountIDPrompt"
+      prompt: "Please enter the AWS Account ID under which you want to create your bucket"
+      default: 123456789012
+      private: no
+
+    - name: "S3FileStorageIAMUsernamePrompt"
+      prompt: "Enter a username for Content Controller to use for accessing S3."
+      default: "mycompany-managed-cc-s3-user"
+      private: no
+  roles:
+    - aws-s3
