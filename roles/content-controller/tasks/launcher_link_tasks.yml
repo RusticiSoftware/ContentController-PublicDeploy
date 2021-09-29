@@ -1,0 +1,35 @@
+- name: Determine Launch Link release name
+  set_fact:
+    launcher_link_build_name: "{{ build_name | regex_replace('ContentController', 'LauncherLink') }}"
+
+- name: copy over launcherlink archive
+  copy: src="{{ launcher_link_build_name }}.zip" dest="/tmp/{{ launcher_link_build_name }}.zip" mode=0700 force=true
+  when: not use_art and not use_s3_release
+
+
+- name: Fetch Launcher Link from S3
+  aws_s3:
+    bucket="rustici-release-cc-launcherlink"
+    object={{ item.src }}
+    dest={{ item.dest }}
+    mode=get
+    aws_access_key={{ s3_download_key }}
+    aws_secret_key={{ s3_download_secret }}
+    region="us-east-1"
+  when: use_s3_release
+  with_items:
+    - { src: "{{ launcher_link_build_name }}.zip", dest: "/tmp/{{ launcher_link_build_name }}.zip" }
+    - { src: "{{ launcher_link_build_name }}.zip.sha1", dest: "/tmp/{{ launcher_link_build_name }}.zip.sha1" }
+
+
+- name: create path for launcher link files
+  file:
+    path: "{{ html_path }}/launcherlink"
+    state: directory
+
+- name: unzip launcher link archive on target machine
+  unarchive:
+    src="/tmp/{{ launcher_link_build_name }}.zip"
+    dest="{{ html_path }}/launcherlink"
+    copy=no
+    force=yes
