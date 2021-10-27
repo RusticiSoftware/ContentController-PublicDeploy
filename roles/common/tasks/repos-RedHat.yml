@@ -1,0 +1,22 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat {{ redhat_version }} variants"
+  copy:
+    src: "epel-release-latest-{{ redhat_version }}.noarch.rpm"
+    dest: "/tmp/epel-release-latest-{{ redhat_version }}.noarch.rpm"
+
+- name: "Install rpm for EPEL Repository for RedHat {{ redhat_version }} variants"
+  yum:
+    name: "/tmp/epel-release-latest-{{ redhat_version }}.noarch.rpm"
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: Run version-specific repository setup tasks
+  include_tasks: "repos-{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+
+- name: Run yum update
+  yum: name=* state=latest
+  when: not noupgrade
