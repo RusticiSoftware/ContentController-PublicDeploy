@@ -1,0 +1,38 @@
+---
+- name: "Install server and client with dependencies"
+  apt:
+    name: "{{ (mysql_version == '8.0') | ternary('mysql-server', 'mysql-community-server') }}"
+    state: present
+    dpkg_options: 'force-confold,force-confdef'
+  notify: restart mysql
+
+- name: Install other packages
+  package: name={{ item }} state=present
+  with_items:
+    - python-mysqldb
+    - libmysql-java
+
+- name: Bind MySQL server to all interfaces
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^bind-address" line='bind-address = 0.0.0.0'
+  notify: restart mysql
+
+- name: Set MySQL server variables
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^{{ item.property }}" line='{{ item.property }} = {{ item.value }}'
+  notify: restart mysql
+  with_items:
+    - { property: "sql_mode", value: "NO_ENGINE_SUBSTITUTION" }
+    - { property: "default_authentication_plugin", value: "mysql_native_password" }
+    - { property: "log_bin_trust_function_creators", value: "1" }
+  register: mysql_variables
+
+- name: Start MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    # To avoid restarting the service unnecessarily, we should only restart
+    # MySQL if the previous step actually changed something.
+    state: "{{ mysql_variables.changed | ternary('restarted', 'started') }}"
+    enabled: true
+
+- name: Run MySQL upgrade tool
+  shell: mysql_upgrade
+  ignore_errors: true
