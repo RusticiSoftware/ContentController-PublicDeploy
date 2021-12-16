@@ -1,0 +1,13 @@
+---
+
+- name: Install Java
+  include_tasks: "install-{{ ansible_os_family }}.yml"
+
+- name: Find Java home directory
+  shell: readlink -f /usr/bin/javac | sed "s:/bin/javac::"
+  register: java_readlink
+
+- name: Set Java home directory
+  set_fact:
+    java_home: "{{ java_readlink.stdout }}"
+  when: java_home is undefined
