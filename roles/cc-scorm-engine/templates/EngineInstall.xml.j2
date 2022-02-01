@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<properties>
+  <!--
+    Settings for the database you are migrating from, your current database.
+    If you do not provide a "target" database, the upgrade tool will perform
+    the upgrade in-place.
+  -->
+  <src>
+    <!--
+      Copy DataPersistenceEngine and DatabaseConnectionString entries from
+      your current Engine configuration.
+    -->
+    <entry key="DataPersistenceEngine">mysql</entry>
+    <entry key="SystemConnectionString">{{ engine_db_url }}?user={{ engine_db_username }}&amp;password={{ engine_db_password }}&amp;useSsl={{ db_use_ssl }}&amp;enabledSslProtocolSuites={{ db_ssl_protocols }}|org.mariadb.jdbc.Driver</entry>
+    <entry key="TenantConnectionString">{{ engine_db_url }}?user={{ engine_db_username }}&amp;password={{ engine_db_password }}&amp;useSsl={{ db_use_ssl }}&amp;enabledSslProtocolSuites={{ db_ssl_protocols }}|org.mariadb.jdbc.Driver</entry>
+  </src>
+
+  <entry key="SkipRowCountAudit">True</entry>
+  <entry key="SkippedPhases">CountUpgradeableRowsPhase,DeleteOrphanedRowsPhase</entry>
+  <entry key="SkipPreTransformationRowCount">True</entry>
+  <entry key="IncludeApiIntegration">True</entry>
+  <entry key="xAPIFilesPath">{{ content_root }}/xapi</entry>
+  {% if S3ObjectStorageEnabled is defined and S3ObjectStorageEnabled %}
+  <!-- S3StreamingFileStore -->
+  <entry key="AwsSecretId">{{ S3FileStorageAwsId }}</entry>
+  <entry key="AwsSecretKey">{{ S3FileStorageAwsKey }}</entry>
+  <entry key="S3RegionName">{{ S3FileStorageRegion }}</entry>
+  <entry key="S3BucketName">{{ S3FileStorageBucket }}</entry>
+  <!-- End S3StreamingFileStore -->
+  {% endif %}
+</properties>
