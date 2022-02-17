@@ -1,0 +1,12 @@
+name = "RusticiApiDocs"
+license = "MIT"
+licenselink = "https://github.com/yourname/yourtheme/blob/master/LICENSE"
+description = "Rustici documentation theme."
+homepage = "http://example.com/"
+tags = []
+features = []
+min_version = "0.41"
+
+[author]
+  name = "Josh White"
+  homepage = "https://github.com/DillGromble"
