@@ -1,0 +1,12 @@
+[Unit]
+Description=Apache Tomcat Web Application Container
+After=network.target
+[Service]
+Type=forking
+ExecStart={{ tomcat_base }}/bin/startup.sh
+ExecStop={{ tomcat_base }}/shutdown.sh
+Environment="JAVA_OPTS=-Xms{{ engine_heap_size }} -Xmx{{ engine_heap_size }}"
+User=tomcat
+Group=tomcat
+[Install]
+WantedBy=multi-user.target
