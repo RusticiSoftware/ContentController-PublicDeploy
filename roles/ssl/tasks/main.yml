@@ -1,0 +1,61 @@
+---
+
+ - name: Install SSL Public certificate
+   copy: src={{ ssl_certificate }} dest="/etc/ssl/certs/{{ ssl_certificate }}" owner=root group=root mode=0644
+   when: not use_self_signed and use_ssl
+
+ - name: Link directories on RedHat
+   file:
+      state: link
+      src: /etc/pki/tls/private
+      dest: /etc/ssl/private
+   when: ansible_os_family == 'RedHat'
+   ignore_errors: true
+
+ - name: Install SSL Private key (Ubuntu)
+   copy: src={{ ssl_key }} dest="/etc/ssl/private/{{ ssl_key }}" owner=root group=ssl-cert mode=0640
+   when: not use_self_signed and use_ssl and ansible_os_family == 'Debian'
+
+ - name: Install SSL Private key (RedHat)
+   copy: src={{ ssl_key }} dest="/etc/ssl/private/{{ ssl_key }}" owner=root group=root mode=0600
+   when: not use_self_signed and use_ssl and ansible_os_family == 'RedHat'
+
+ - name: Install Certificate Chain
+   copy: src={{ ssl_chain }} dest="/etc/ssl/certs/{{ ssl_chain }}" owner=root group=root mode=0644
+   when: not use_self_signed and use_ssl and ssl_chain != None
+
+ - name: Copy over SSL Self-signed cert generation script
+   template: src=genSelfSigned.sh.j2 dest=/usr/local/sbin/genSelfSigned.sh mode=0700 owner=root group=root
+   when: use_self_signed and use_ssl and ansible_os_family == 'Debian'
+
+ - name: create self-signed SSL cert and import into java keystore
+   shell: /usr/local/sbin/genSelfSigned.sh
+   notify: restart httpd
+   register: createssl
+   when: use_self_signed and use_ssl and ansible_os_family == 'Debian'
+
+ - name: Output from Create SSL script
+   debug: msg= {{ createssl.stdout_lines }}
+   ignore_errors: true
+   when: use_self_signed and use_ssl and ansible_os_family == 'Debian'
+
+ - name: Validate DB SSL arguments
+   fail:
+     msg: "db_use_ssl was set to true, but db_ssl_cert was not provided"
+   when: db_use_ssl and db_ssl_cert is not defined
+
+ - name: Copy DB SSL Certificate
+   copy:
+     src: "{{ db_ssl_cert }}"
+     dest: "/tmp/{{ db_ssl_cert }}"
+     mode: 0644
+   when: db_use_ssl
+
+ - name: Import local SSL certificate into the java keystore
+   java_cert:
+     cert_alias: cc_database
+     cert_path: "/tmp/{{ db_ssl_cert }}"
+     keystore_path: "{{ java_home }}/jre/lib/security/cacerts"
+     keystore_pass: changeit
+     state: present
+   when: db_use_ssl
