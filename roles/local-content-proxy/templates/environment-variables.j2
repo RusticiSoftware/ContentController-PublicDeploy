@@ -1,0 +1,14 @@
+CONTENT_PROXY_S3_BUCKET_NAME="{{ S3FileStorageBucket }}"
+CONTENT_PROXY_CLOUDFRONT_PUBLIC_KEY_PATH="{{ cc_deploy_path }}/bin/{{ cloudfront_public_key }}"
+
+{% if not enable_contentvault %}
+CONTENT_PROXY_S3_STRIP_PREFIX=""
+{% endif %}
+
+CONTENT_PROXY_LISTEN_PORT="8090"
+
+CONTENT_AUTH_STRATEGY="{{ 'CONTENTVAULT' if enable_contentvault else 'CLOUDFRONT' }}"
+CC_SERVER_ADDRESS="{{ ServerName }}"
+
+AWS_ACCESS_KEY_ID="{{ S3FileStorageAwsId }}"
+AWS_SECRET_ACCESS_KEY="{{ S3FileStorageAwsKey }}"
