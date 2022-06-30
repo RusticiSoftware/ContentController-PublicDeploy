@@ -1,0 +1,3 @@
+[submodule "themes/rustici-docs-hugo-theme"]
+	path = themes/rustici-docs-hugo-theme
+	url = https://github.com/RusticiSoftware/rustici-docs-hugo-theme.git
