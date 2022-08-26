@@ -1,0 +1,10 @@
+---
+
+- name: install openjdk-8
+  package:
+    name: java-1.8.0-openjdk-devel
+    state: latest
+
+- name: Enable FIPS
+  include_tasks: "fips.yml"
+  when: fips_support_enabled

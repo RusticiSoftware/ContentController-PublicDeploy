@@ -1,0 +1,22 @@
+---
+
+engine_db_password: s9Iw8GCbe9IlJWwU
+
+console_password: 955ddin3-ca7e-4fx5-8141-a05c4d92f3d1
+
+# This setting can have a powerful effect on database usage in busy environments.
+# It controls how frequently a course calls RecordResults.jsp
+# In milliseconds
+# Default value is 10000
+# Suggest value for a busy environment is 20000
+DefaultCommCommitFrequency: 10000
+
+# The frequency (in milliseconds) the dispatch package will poll back to Engine
+# for an updated registration state. This setting will be used only by non-SCORM
+# content packages.
+#
+# Default value is 1500 milliseconds
+DispatchPollingFrequency: 1500
+
+# Whether or not the `accountServiceHomePage` of actors launching Tin Can courses should be different for each account
+tin_can_account_system_page: true

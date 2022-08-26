@@ -1,0 +1,65 @@
+---
+# tasks file for enabling fips on a RHEL-8 Server
+
+- name: Check for supported version
+  ansible.builtin.fail:
+    msg: "FIPS is currently only supported on RHEL-8, detected: {{ ansible_distribution }}"
+  when: ansible_os_family != 'RedHat' and ansible_distribution_major_version != "8"
+
+- name: Check if FIPS is enabled
+  ansible.builtin.command:
+    cmd: 'sysctl crypto.fips_enabled'
+  register: fips_sysctl_output
+  changed_when: fips_sysctl_output.rc != 0
+
+- name: Set the FIPS status
+  ansible.builtin.set_fact:
+    fips_sysctl_enabled: "{{ fips_sysctl_output.stdout.endswith('1') }}"
+
+- name: Report the FIPS status
+  ansible.builtin.debug:
+    msg: "fips_sysctl_enable : {{ fips_sysctl_enabled }} "
+
+- name: Report that we are enabling FIPS
+  ansible.builtin.debug:
+    msg: "Enabling FIPS because it has not been enabled yet"
+  when: not fips_sysctl_enabled
+
+- name: Report that we skipping FIPS steps
+  ansible.builtin.debug:
+    msg: "Skipping FIPS setup because it is already enabled"
+  when: fips_sysctl_enabled
+
+- name: Install dracut-fips
+  ansible.builtin.yum:
+    name: dracut-fips
+    state: present
+  when: not fips_sysctl_enabled
+
+- name: Checking for AES-NI
+  ansible.builtin.command:
+    cmd: cat /proc/cpuinfo
+  register: cpu_contents
+  changed_when: cpu_contents.rc != 0
+
+- name: Installing dracut-fips-aesni if AES support is found
+  ansible.builtin.yum:
+    name: dracut-fips-aesni
+    state: present
+  when: cpu_contents.stdout.find('aes') != -1 and (not fips_sysctl_enabled)
+
+- name: Enabling FIPS
+  ansible.builtin.command:
+    cmd: fips-mode-setup --enable
+  register: fips_setup_output
+  when: not fips_sysctl_enabled
+
+- name: Report the fips-setup output
+  ansible.builtin.debug:
+    msg: "fips_setup: {{ fips_setup_output }}"
+  when: not fips_sysctl_enabled
+
+- name: Inform of need to reboot
+  ansible.builtin.debug:
+    msg: "WARNING: A system reboot is required to finalize enabling FIPS"
+  when: not fips_sysctl_enabled

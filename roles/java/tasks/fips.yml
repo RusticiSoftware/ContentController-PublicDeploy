@@ -1,0 +1,27 @@
+# Setup java and supporting files when fips support is enabled
+---
+
+- name: Setup the fips providers in java.security
+  copy:
+    src: java.security
+    dest: /etc/java/java-1.8.0-openjdk/java-1.8.0-openjdk-1.8.0.342.b07-2.el8_6.x86_64/lib/security/java.security
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+
+- name: Place bouncy castle libraries in the classpath  [JRE] [1 of 2]
+  copy:
+    src: bc-fips-1.0.2.3.jar
+    dest: /usr/lib/jvm/jre/lib/ext/bc-fips-1.0.2.3.jar
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Place bouncy castle libraries in the classpath  [JRE] [2 of 2]
+  copy:
+    src: bcpkix-fips-1.0.6.jar
+    dest: /usr/lib/jvm/jre/lib/ext/bcpkix-fips-1.0.6.jar
+    owner: root
+    group: root
+    mode: '0644'
