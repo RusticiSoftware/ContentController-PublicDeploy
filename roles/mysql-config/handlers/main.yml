@@ -1,0 +1,7 @@
+
+  - name: restart mysql
+    action: service name="{{mysql_daemon}}" state=restarted
+
+  - name: flush privs
+    command: mysql -u "{{ mysql_root_user }}" -h "{{ cc_db_host }}" -p"{{ mysql_root_password}}" -e 'FLUSH PRIVILEGES;'
+
