@@ -1,0 +1,7 @@
+---
+- name: Run version-specific repository setup tasks
+  include_tasks: "repos-{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+
+- name: Run yum update
+  yum: name=* state=latest
+  when: not noupgrade
