@@ -1,0 +1,13 @@
+---
+
+- name: install openjdk-8
+  package:
+    name: java-1.8.0-openjdk-devel
+    state: latest
+  when: not is_4p0_or_later
+
+- name: install openjdk-11
+  package:
+    name: java-11-openjdk-devel
+    state: latest
+  when: is_4p0_or_later
