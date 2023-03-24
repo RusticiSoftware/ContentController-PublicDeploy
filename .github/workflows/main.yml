@@ -1,0 +1,35 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  forward-port:
+    # Need a GH runner bc Docker stuff isn't working on our self-hosted runner for some reason
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Checkout new branch for PR
+        run: |
+          git checkout -b master-forward-port
+          git push -uf origin master-forward-port
+
+      - name: pull-request
+        id: pull-request
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: "master-forward-port"
+          destination_branch: "development"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_assignee: "dlindsey7"
+          pr_reviewer: "dlindsey7"
