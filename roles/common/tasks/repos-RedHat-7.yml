@@ -1,0 +1,39 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat 7 variants"
+  copy:
+    src: "epel-release-latest-7.noarch.rpm"
+    dest: "/tmp/epel-release-latest-7.noarch.rpm"
+
+- name: "Install rpm for EPEL Repository for RedHat 7 variants"
+  yum:
+    name: "/tmp/epel-release-latest-7.noarch.rpm"
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: "Set MySQL repo name for {{ mysql_version }}"
+  set_fact:
+    mysql_repo_version: "{{ (mysql_version == '5.7') | ternary('7-11', '7-1') }}"
+
+- name: Fetch MySQL yum repo
+  get_url:
+    url: "https://repo.mysql.com/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_repo_version }}.noarch.rpm"
+    dest: "/tmp/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_repo_version }}.noarch.rpm"
+    mode: 0750
+
+- name: Install MySQL repo
+  yum:
+    name: "/tmp/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_repo_version }}.noarch.rpm"
+    state: present
+
+- name: Update MySQL repo list to use new key
+  shell: rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+
+- name: Install pip
+  package:
+    name: python-pip
+    state: latest
+    update_cache: yes
