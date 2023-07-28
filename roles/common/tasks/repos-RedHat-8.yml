@@ -1,0 +1,30 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat 8 variants"
+  copy:
+    src: "epel-release-latest-8.noarch.rpm"
+    dest: "/tmp/epel-release-latest-8.noarch.rpm"
+
+- name: "Install rpm for EPEL Repository for RedHat 8 variants"
+  yum:
+    name: "/tmp/epel-release-latest-8.noarch.rpm"
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: Disable default MySQL repo (if using RHEL 8)
+  shell: sudo dnf remove -y @mysql && sudo dnf module reset -y mysql && sudo dnf module disable -y mysql
+  when: mysql_version == "5.7"
+
+- name: Add MySQL repository (if using RHEL 8)
+  copy:
+    src: mysql-community.repo
+    dest: /etc/yum.repos.d/mysql-community.repo
+  when: mysql_version == "5.7"
+
+- name: Disable mysql80 and enable mysql{{ mysql_version | regex_replace('\.', '') }}
+  # Can't use Ansible's built-in yum module because it doesn't support config-manager
+  shell: yum config-manager --enable mysql{{ mysql_version | regex_replace('\.', '') }}-community
+  when: mysql_version == "5.7"
