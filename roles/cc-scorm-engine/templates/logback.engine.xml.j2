@@ -1,0 +1,24 @@
+<configuration>
+  <appender name="LogFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${catalina.home:-.}/logs/scormengine.log</file>
+    <!-- encoders are assigned the type
+         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>%-5level %date{yyyy-MM-dd HH:mm:ss,UTC} UTC – %m%n</pattern>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <fileNamePattern>${catalina.home:-.}/logs/scormengine.%i.log</fileNamePattern>
+      <minIndex>1</minIndex>
+      <maxIndex>3</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>10MB</maxFileSize>
+    </triggeringPolicy>
+  </appender>
+  {% for logger_name, log_level in engine_custom_log_levels.items() %}
+  <logger name="{{ logger_name }}" level="{{ log_level }}" />
+  {% endfor %}
+  <root level="{{ engine_log_level }}">
+    <appender-ref ref="LogFileAppender" />
+  </root>
+</configuration>
