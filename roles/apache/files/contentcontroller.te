@@ -1,0 +1,14 @@
+
+module contentcontroller 1.0;
+
+require {
+	type init_t;
+	type var_lib_t;
+	class file { execute execute_no_trans };
+}
+
+#============= init_t ==============
+
+#!!!! This avc is allowed in the current policy
+allow init_t var_lib_t:file execute;
+allow init_t var_lib_t:file execute_no_trans;
