@@ -1,0 +1,127 @@
+---
+# tasks file for enabling fips on a RHEL-8 Server
+
+- name: Find java-11-openjdk directory
+  find:
+    paths: /usr/lib/jvm
+    patterns: "java-11-openjdk*"
+    file_type: "directory"
+  register: java_path
+
+- name: Get Java 11 directory path
+  set_fact:
+    java11_dir_path: "{{ java_path.files | map(attribute='path') | first }}"
+
+- name: Create directory for bouncy castle libraries
+  file:
+    path: "{{ java11_dir_path }}/lib/bc-fips/"
+    state: directory
+
+- name: Move bouncy castle libraries [1 of 2]
+  copy:
+    src: bc-fips-1.0.2.3.jar
+    dest: "{{ java11_dir_path }}/lib/bc-fips/bc-fips-1.0.2.3.jar"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Move bouncy castle libraries [2 of 2]
+  copy:
+    src: bcpkix-fips-1.0.7.jar
+    dest: "{{ java11_dir_path }}/lib/bc-fips/bcpkix-fips-1.0.7.jar"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Check if custom JRE exists
+  stat:
+    path: /usr/lib/jvm/java-fips
+  register: jre_check
+
+- name: Set fact based on JRE existence
+  set_fact:
+    jre_exists: "{{ jre_check.stat.exists }}"
+
+- name: Install jmods
+  package:
+    name: java-11-openjdk-jmods
+    state: present
+
+- name: Create custom fips JRE
+  shell: |
+    cd {{ java11_dir_path }}/bin
+    ./jlink --no-header-files --no-man-pages --compress=2 --module-path {{ java11_dir_path }}/lib/bc-fips --add-modules org.bouncycastle.fips.core,"$(java --list-modules | awk '{print $1}' | sed 's/@.*//' | paste -sd "," -)" --output /usr/lib/jvm/java-fips --ignore-signing-information
+  when: not jre_exists
+
+- name: Set fips java home directory
+  set_fact:
+    fips_java_home: /usr/lib/jvm/java-fips
+
+- name: Setup the fips providers in java.security
+  copy:
+    src: java.security
+    dest: /usr/lib/jvm/java-fips/conf/security
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+
+- name: Check for supported version
+  fail:
+    msg: "FIPS is currently only supported on RHEL-8, detected: {{ ansible_distribution }}"
+  when: ansible_os_family != 'RedHat' or ansible_distribution_major_version != "8"
+
+- name: Check if FIPS is enabled
+  shell: cat /proc/sys/crypto/fips_enabled
+  register: fips_enabled_output
+  changed_when: false
+
+- name: Set fact of FIPS enabled status
+  set_fact:
+    fips_sysctl_enabled: "{{ fips_enabled_output.stdout == '1' }}"
+
+- name: Report the FIPS status
+  debug:
+    msg: "fips_sysctl_enable : {{ fips_sysctl_enabled }} "
+
+- name: Report that we are enabling FIPS
+  debug:
+    msg: "Enabling FIPS because it has not been enabled yet"
+  when: not fips_sysctl_enabled
+
+- name: Report that we are skipping FIPS steps
+  debug:
+    msg: "Skipping FIPS setup because it is already enabled"
+  when: fips_sysctl_enabled
+
+- name: Install dracut-fips
+  yum:
+    name: dracut-fips
+    state: present
+  when: not fips_sysctl_enabled
+
+- name: Checking for AES-NI
+  raw: cat /proc/cpuinfo
+  register: cpu_contents
+  changed_when: cpu_contents.rc != 0
+
+- name: Installing dracut-fips-aesni if AES support is found
+  yum:
+    name: dracut-fips-aesni
+    state: present
+  when: cpu_contents.stdout.find('aes') != -1 and (not fips_sysctl_enabled)
+
+- name: Enabling FIPS
+  raw: fips-mode-setup --enable
+  register: fips_setup_output
+  when: not fips_sysctl_enabled
+
+- name: Report the fips-setup output
+  debug:
+    msg: "fips_setup: {{ fips_setup_output }}"
+  when: not fips_sysctl_enabled
+
+- name: Inform of need to reboot
+  debug:
+    msg: "WARNING: A system reboot is required to finalize enabling FIPS"
+  when: not fips_sysctl_enabled
