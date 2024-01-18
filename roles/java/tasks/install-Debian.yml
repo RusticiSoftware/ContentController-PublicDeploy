@@ -1,0 +1,21 @@
+---
+
+- name: install openjdk8
+  package:
+    name: openjdk-8-jdk
+    state: latest
+  when: not is_4p0_or_later
+
+- name: Add openjdk11 repo
+  command: add-apt-repository --yes ppa:openjdk-r/ppa
+  when: is_4p0_or_later
+
+- name: apt update
+  command: apt -y update
+  when: is_4p0_or_later
+
+- name: install openjdk11
+  package:
+    name: openjdk-11-jdk
+    state: latest
+  when: is_4p0_or_later
