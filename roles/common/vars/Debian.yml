@@ -1,0 +1,4 @@
+---
+common_platform_packages:
+  - vim-nox
+  - openssl
