@@ -1,0 +1,3 @@
+---
+dependencies:
+  - { role: java, when: use_self_signed }
