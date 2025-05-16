@@ -1,0 +1,22 @@
+---
+- name: Enable HTTP Virtual Host
+  command: a2ensite 000-default.conf
+  notify: restart httpd
+
+- name: Enable HTTPS Virtual Host
+  command: a2ensite 000-default-ssl.conf
+  notify: restart httpd
+  when: use_ssl
+
+- name: Disable mpm_event mod
+  command: a2dismod mpm_event
+  notify: restart httpd
+
+- name: Enable required mods
+  command: a2enmod rewrite ssl proxy proxy_http headers jk mpm_prefork expires
+  notify: restart httpd
+
+- name: Install Logrotate file
+  template:
+    src: apache2.logrotate
+    dest: /etc/logrotate.d/apache.logrotate
