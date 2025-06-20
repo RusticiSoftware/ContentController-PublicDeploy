@@ -1,0 +1,59 @@
+---
+- name: "Install server and client with dependencies"
+  apt:
+    name: "mysql-server"
+    state: present
+    dpkg_options: 'force-confold,force-confdef'
+  notify: restart mysql
+  when: not (ansible_distribution_major_version == "20")
+
+# Install the MySQL repository so that we can grab our MySQL version. If repo is outdated, see here: https://dev.mysql.com/downloads/repo/apt/
+- name: Fetch MySQL {{ mysql_version }} apt repo config tool
+  get_url:
+    url: "https://repo.mysql.com/mysql-apt-config_0.8.29-1_all.deb"
+    dest: "/tmp/mysql-apt-config_all.deb"
+    mode: 0750
+  when: ansible_distribution_major_version < "20"
+
+- name: Download MySQL from repo for unsupported Ubuntu version {{ ansible_distribution_major_version }}
+  shell: |
+    echo mysql-apt-config mysql-apt-config/unsupported-platform select ubuntu {{ ansible_distribution_release }} | sudo debconf-set-selections
+    echo mysql-apt-config mysql-apt-config/repo-codename select {{ ansible_distribution_release }} | sudo debconf-set-selections
+    echo mysql-apt-config mysql-apt-config/select-server select mysql-{{ mysql_version }} | sudo debconf-set-selections
+    DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/mysql-apt-config_all.deb
+    apt update
+  when: ansible_distribution_major_version < "20"
+
+- name: Install MySQL {{ mysql_version }}
+  shell: |
+    DEBIAN_FRONTEND=noninteractive apt install -fy mysql-client={{ mysql_version }}* mysql-server={{ mysql_version }}*
+
+- name: Install other packages
+  package: name={{ item }} state=present
+  with_items:
+    - libmariadb-java
+
+- name: Bind MySQL server to all interfaces
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^bind-address" line='bind-address = 0.0.0.0'
+  notify: restart mysql
+
+- name: Set MySQL server variables
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^{{ item.property }}" line='{{ item.property }} = {{ item.value }}'
+  notify: restart mysql
+  with_items:
+    - { property: "sql_mode", value: "NO_ENGINE_SUBSTITUTION" }
+    - { property: "default_authentication_plugin", value: "mysql_native_password" }
+    - { property: "log_bin_trust_function_creators", value: "1" }
+  register: mysql_variables
+
+- name: Start MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    # To avoid restarting the service unnecessarily, we should only restart
+    # MySQL if the previous step actually changed something.
+    state: "{{ mysql_variables.changed | ternary('restarted', 'started') }}"
+    enabled: true
+
+- name: Run MySQL upgrade tool
+  shell: mysql_upgrade
+  ignore_errors: true
