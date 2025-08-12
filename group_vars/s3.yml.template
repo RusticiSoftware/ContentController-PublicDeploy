@@ -1,0 +1,48 @@
+---
+
+# Configuration for using Amazon S3 for content storage
+# If you aren't using S3, you can safely ignore this file
+
+# The variable in env.yml called S3FileStorageEnabled must be set to "True" for any of this to have an effect.
+
+########################
+# Vars you need to set #
+########################
+
+# The Account ID in which your bucket lives
+S3AWSAccountID: 2134123412341234
+
+# If you are using S3 for content storage, this should be an AWS Keypair
+# that has read/write access to the bucket where your content lives
+# To generate IAM and bucket policies suitable for your purposes, please see the README
+# and search for "S3 Support"
+S3FileStorageIAMUsername: "contentcontroller-s3user"
+S3FileStorageAwsId: "YourAWS-IAM-API-id"
+S3FileStorageAwsKey: "YourIAM-API-Secret-Key"
+
+# The name of the bucket in which you'll store your content.
+S3FileStorageBucket: "cc-content-storage"
+
+# The S3 region to use.
+S3FileStorageRegion: "us-east-1"
+
+# The S3 endpoint to connect to; should match the region set above, can not contain a custom port
+S3Endpoint: "s3-external-1.amazonaws.com"
+
+# The HTTP port to use for S3 (optional)
+#cc_s3_http_port: 80
+
+# The HTTPS port to use for S3 (optional)
+#cc_s3_https_port: 443
+
+# Force HTTPS for S3 (optional, default `true`)
+#cc_s3_https_only: true
+
+# Disable DNS buckets (see http://www.jets3t.org/toolkit/configuration.html for more info)
+#cc_s3_disable_dns_buckets: false
+
+############################
+# End Vars you need to set #
+############################
+
+S3FileStorageTempDir: "{{ data_root }}/s3temp"

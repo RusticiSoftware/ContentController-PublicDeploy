@@ -1,0 +1,17 @@
+baseURL: "https://docs.contentcontroller.com/integration/"
+languageCode: "en-us"
+title: "Content Controller - Integrations"
+theme: "rustici-docs-hugo-theme"
+
+menu:
+  main:
+    - identifier: cc_content
+      name: "Content"
+      weight: 6
+
+    - identifier: features
+      name: "Features"
+      weight: 7
+
+params:
+  logo: '/integration/images/CC_Rustici_landscape_white.svg'
