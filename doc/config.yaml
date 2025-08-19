@@ -1,0 +1,24 @@
+baseURL: "https://docs.contentcontroller.com/self-hosting/"
+languageCode: "en-us"
+title: "Content Controller"
+theme: "rustici-docs-hugo-theme"
+
+menu:
+  main:
+    - identifier: aws
+      name: "AWS"
+      weight: 6
+
+    - identifier: faq
+      name: "FAQ"
+      weight: 7
+
+    - identifier: release-notes
+      name: "Release Notes"
+      url: "https://support.scorm.com/hc/en-us/sections/115000419513-Release-Notes"
+      weight: 8
+
+    - identifier: knowledge-base
+      name: "Knowledge Base"
+      url: "https://support.scorm.com/hc/en-us/categories/201445406-Content-Controller"
+      weight: 9
