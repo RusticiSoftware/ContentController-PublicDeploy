@@ -1,0 +1,49 @@
+---
+- name: Use local apt cache if desired
+  template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf mode=0644
+  when: use_local_apt_cache
+
+- name: Remove local apt cache if disabled
+  file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+  when: not use_local_apt_cache
+
+- name: Add MySQL 8.0 repository
+  ansible.builtin.deb822_repository:
+    name: mysql-8.0
+    state: present
+    uris: "http://repo.mysql.com/apt/{{ 'ubuntu' if ansible_distribution == 'Ubuntu' else 'debian' }}/"
+    suites: "{{ ansible_distribution_release }}"
+    components: "mysql-8.0"
+    signed_by: "https://repo.mysql.com/RPM-GPG-KEY-mysql-2023"
+  when: mysql_version == "8.0"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Cleanup MySQL dependencies
+  package: name="mysql-utilities" state=absent
+
+- name: Run aptitude safe-upgrade
+  apt: upgrade=safe
+  when: not noupgrade
+
+- name: Install pip
+  package:
+    name: python-pip
+    state: latest
+    update_cache: yes
+  when: ansible_distribution_major_version < "20"
+
+- name: Install MySQL client
+  package:
+    name: mysql-client
+    state: present
+
+- name: Install MySQL dependencies
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - python3-pymysql
+    - python3-mysqldb
