@@ -1,0 +1,16 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat 9 variants"
+  copy:
+    src: "epel-release-latest-9.noarch.rpm"
+    dest: "/tmp/epel-release-latest-9.noarch.rpm"
+
+- name: Install GPG key
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}
+    state: present
+
+- name: Install pip
+  package:
+    name: python-pip
+    state: latest
+    update_cache: yes

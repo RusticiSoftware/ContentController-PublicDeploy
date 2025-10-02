@@ -1,0 +1,23 @@
+---
+
+# These vars only need to be set if you're using the build_ami.yml playbook to create your own AMIs
+
+# The AWS region for your VPC
+aws_region: us-east-1
+
+# The ID of your first private VPC subnet (application server subnet)
+ami_build_vpc_subnet_id: # subnet-xxxxxxxx
+
+# The ID for your application server security group
+ami_build_security_group_id: # sg-xxxxxxxx
+
+# The temporary instance size used for building the AMI
+instance_size: t2.medium
+
+# The name of the SSH key you use for creating your applications
+ssh_key: rustici-cc
+
+# Default AMI, which is just a boilerplate Ubuntu 18.04 box
+# If you want to add your own customizations to app servers, create a new Ubuntu box, apply your
+# customizations, create an AMI of it, and then enter that AMI's ID here
+webami: ami-7ad76705
