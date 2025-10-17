@@ -1,0 +1,7 @@
+---
+
+use_self_signed: false
+
+db_use_ssl: false
+db_ssl_protocols: "TLSv1,TLSv1.1,TLSv1.2"
+db_ssl_cert: "rds-ca-2019-root.crt"
