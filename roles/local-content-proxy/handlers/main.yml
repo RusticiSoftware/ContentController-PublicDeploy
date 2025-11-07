@@ -1,0 +1,4 @@
+- name: restart content proxy
+  systemd:
+    service: content-proxy
+    state: restarted
