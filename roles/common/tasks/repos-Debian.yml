@@ -1,0 +1,186 @@
+---
+- name: Use local apt cache if desired
+  template: src=90-apt-proxy.conf.j2 dest=/etc/apt/apt.conf.d/90-apt-proxy.conf mode=0644
+  when: use_local_apt_cache
+
+- name: Remove local apt cache if disabled
+  file: dest=/etc/apt/apt.conf.d/90-apt-proxy.conf state=absent
+  when: not use_local_apt_cache
+
+- name: Copy apt release signing key for MySQL
+  copy:
+    src: "mysql-releases.key"
+    dest: "/tmp/mysql-releases.key"
+    mode: 0600
+    force: true
+
+- name: Add apt release signing key for MySQL
+  apt_key:
+    file: "/tmp/mysql-releases.key"
+    state: present
+
+# Expires 02/17/2019
+- name: Copy apt release signing key for MySQL
+  copy:
+    src: "mysql-releases.key"
+    dest: "/tmp/mysql-releases.key"
+    mode: 0600
+    force: true
+
+- name: Add apt release signing key for MySQL
+  apt_key:
+    file: "/tmp/mysql-releases.key"
+    state: present
+
+- name: Cleanup MySQL dependencies
+  package: name="mysql-utilities" state=absent
+
+# Install the MySQL repository so that we can grab our MySQL version. If repo is outdated, see here: https://dev.mysql.com/downloads/repo/apt/
+- name: Add MySQL repo key for apt repo config tool
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: B7B3B788A8D3785C
+    state: present
+  when: ansible_distribution_major_version < "20"
+
+- name: Fetch MySQL {{ mysql_version }} apt repo config tool
+  get_url:
+    url: "https://repo.mysql.com/mysql-apt-config_0.8.29-1_all.deb"
+    dest: "/tmp/mysql-apt-config_all.deb"
+    mode: 0750
+  when: ansible_distribution_major_version < "20"
+
+- name: Specify MySQL tool version to use (<Ubuntu20)
+  shell: "echo mysql-apt-config mysql-apt-config/enable-repo select mysql-{{ mysql_version }} | sudo debconf-set-selections"
+  when: ansible_distribution_major_version < "20" and mysql_version == "5.7"
+
+# Configure mysql-apt-config for Ubuntu20
+- name: Fetch MySQL apt repo config tool (Ubuntu20)
+  get_url:
+    url: "https://repo.mysql.com/mysql-apt-config_0.8.29-1_all.deb"
+    dest: "/tmp/mysql-apt-config_all.deb"
+    mode: 0750
+  when: ansible_distribution_major_version >= "20" or mysql_version == "8.0"
+
+- name: Specify MySQL tool platform to use (Ubuntu20)
+  shell: echo mysql-apt-config mysql-apt-config/unsupported-platform select ubuntu bionic | sudo debconf-set-selections
+  when: ansible_distribution_major_version >= "20" and mysql_version == "5.7"
+
+- name: Specify MySQL tool repo to use (Ubuntu20)
+  shell: echo mysql-apt-config mysql-apt-config/repo-codename select bionic | sudo debconf-set-selections
+  when: ansible_distribution_major_version >= "20" and mysql_version == "5.7"
+
+- name: Specify MySQL tool version to use (Ubuntu20)
+  shell: "echo mysql-apt-config mysql-apt-config/select-server select mysql-{{ mysql_version }} | sudo debconf-set-selections"
+  when: ansible_distribution_major_version >= "20" and mysql_version == "5.7"
+
+- name: Install MySQL apt repo
+  shell: DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/mysql-apt-config_all.deb
+  when: not (ansible_distribution_major_version >= "20" and mysql_version == "8.0")
+  register: mysql_repo_install
+  failed_when: false
+
+- name: Fix any broken dependencies from MySQL repo install
+  shell: DEBIAN_FRONTEND=noninteractive apt-get install -f -y
+  when: not (ansible_distribution_major_version >= "20" and mysql_version == "8.0") and mysql_repo_install.rc != 0
+
+- name: Add MySQL repo key (ensure it's present after repo install)
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: B7B3B788A8D3785C
+    state: present
+  when: not (ansible_distribution_major_version >= "20" and mysql_version == "8.0")
+
+- name: Update apt cache to pull in MySQL repo contents
+  apt: update_cache=yes
+  register: apt_update_result
+  failed_when: false
+
+- name: Get detailed apt update error if apt module failed
+  shell: apt-get update 2>&1
+  register: apt_update_detailed
+  when: apt_update_result.failed
+  changed_when: false
+  failed_when: false
+
+- name: Check for MySQL repository GPG key errors
+  shell: apt-get update 2>&1 | grep -i "gpg\|key\|signature" || true
+  register: mysql_gpg_error
+  when: apt_update_result.failed
+  changed_when: false
+
+- name: Try to fix MySQL repository GPG key issues
+  shell: |
+    # Try to re-add the MySQL key
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B7B3B788A8D3785C || true
+    # Try to update again
+    apt-get update 2>&1 || true
+  register: apt_update_retry
+  when: apt_update_result.failed and mysql_gpg_error.stdout | length > 0
+  changed_when: false
+
+- name: Display apt update errors if any
+  debug:
+    msg: "Apt update had issues. Module error: {{ apt_update_result.msg | default('Unknown error') }}. Detailed output: {{ apt_update_detailed.stderr | default(apt_update_detailed.stdout | default('No output')) }}"
+  when: apt_update_result.failed
+
+- name: Try final apt update after fixes
+  apt: update_cache=yes
+  register: apt_update_final
+  failed_when: false
+  when: apt_update_result.failed
+
+- name: Set fact if apt cache update is broken
+  set_fact:
+    apt_cache_broken: true
+  when: apt_update_result.failed and (apt_update_final.failed | default(true))
+
+- name: Set fact if apt cache update is working
+  set_fact:
+    apt_cache_broken: false
+  when: not (apt_update_result.failed and (apt_update_final.failed | default(true)))
+
+- name: Warn if apt cache update failed but continue
+  debug:
+    msg: "WARNING: Apt cache update failed. Subsequent package installations will skip cache updates. This may be due to MySQL repository configuration issues. Original error: {{ apt_update_result.msg | default('Unknown error') }}. Detailed output: {{ apt_update_detailed.stderr | default(apt_update_detailed.stdout | default('No detailed output available')) }}"
+  when: apt_update_result.failed and (apt_update_final.failed | default(true))
+
+- name: Run aptitude safe-upgrade
+  apt: upgrade=safe
+  when: not noupgrade
+
+- name: Install pip
+  package:
+    name: python-pip
+    state: latest
+    update_cache: "{{ apt_cache_broken | default(false) | bool | ternary('no', 'yes') }}"
+  when: ansible_distribution_major_version < "20"
+  register: pip_install_result
+  failed_when: false
+
+- name: Retry pip install without cache update if needed
+  package:
+    name: python-pip
+    state: latest
+    update_cache: no
+  when: ansible_distribution_major_version < "20" and pip_install_result.failed
+  register: pip_install_retry
+  failed_when: false
+
+- name: Fail if pip install failed
+  fail:
+    msg: "Failed to install pip. Error: {{ pip_install_result.msg | default('Unknown error') }}"
+  when: ansible_distribution_major_version < "20" and pip_install_result.failed and (pip_install_retry.failed | default(true))
+
+- name: Install MySQL client
+  package:
+    name: mysql-client
+    state: present
+
+- name: Install MySQL dependencies
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - python3-pymysql
+    - python3-mysqldb
