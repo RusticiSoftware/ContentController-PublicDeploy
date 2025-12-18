@@ -1,0 +1,52 @@
+# prefork MPM
+# StartServers: number of server processes to start
+# MinSpareServers: minimum number of server processes which are kept spare
+# MaxSpareServers: maximum number of server processes which are kept spare
+# MaxRequestWorkers: maximum number of server processes allowed to start
+# MaxConnectionsPerChild: maximum number of requests a server process serves
+
+# We start a lot of servers here.  Since Apache isn't doing much beyond proxying
+# things, we can start a ton of processes with very little overhead and ensure that lots of servers
+# are available to pick up slack during spikes.
+
+# Each process uses between 5 and 6 MB of physical memory
+# So when it's blown up at 300 Workers you're using about 1800MB
+# That's as much as the application processes on the server can likely handle on typical boxen
+
+# The Application servers aren't really RAM limited - they're more CPU and database i/o bound.
+# So giving Apache lots of RAM to work with is a good trade.
+
+# The MaxRequestWorkers param is controlled by Ansible, so you'll want to set it explicitly in your configs
+# for a production environment.
+
+{% if use_ssl %}
+
+# These settings are appropriate for a box with 4GB RAM that is doing SSL termination.
+# If you're doing SSL termination in Apache, these numbers will have an outsized effect on CPU
+# Start with the default of 150 and tweak from there.
+
+<IfModule mpm_prefork_module>
+        StartServers            30
+        MinSpareServers         15
+        MaxSpareServers         30
+        MaxRequestWorkers        {{ MaxRequestWorkers }}
+        MaxConnectionsPerChild  10000
+</IfModule>
+
+{% else %}
+
+# These settings are appropriate for a box with 4GB RAM that isn't doing SSL termination.
+# You can take the MaxRequestWorkers param quite high on a non-ssl box:  In production on c3.large
+# instances we routinely set this to 500
+
+<IfModule mpm_prefork_module>
+        StartServers            75
+        MinSpareServers         30
+        MaxSpareServers         75
+        MaxRequestWorkers        {{ MaxRequestWorkers }}
+        MaxConnectionsPerChild  10000
+</IfModule>
+
+{% endif %}
+
+# vim: syntax=apache ts=4 sw=4 sts=4 sr noet
