@@ -1,0 +1,37 @@
+# MH relies on its own version of the playbooks, located in cc-deployment-private.
+# Despite this, MH still wants to be informed of any changes that occur in this
+# repo incase it is relevant to their hosting needs. For example, MH will probably
+# need to port over changes made in roles/mysql-config/**, but they don't need
+# changes in roles/mysql-local/**.
+name: Inform MH About -public Changes
+on:
+  pull_request_target:
+    types: [closed]
+    branches:
+      - 'main'
+    paths:
+      - 'roles/tomcat/**'
+      - 'roles/cc-scorm-engine/**'
+      - 'roles/common/**'
+      - 'roles/content-controller/**'
+      - 'roles/mnt/**'
+      - 'roles/mysql-config/**'
+      - 'roles/tomcat/**'
+      - 'roles/java/**'
+      - 'roles/saml/**'
+      - 'roles/ssl/**'
+      - 'build_ami.yml'
+      - 'env.yml'
+
+jobs:
+  notify-slack:
+    if: github.event.pull_request.merged == true && !startsWith(github.head_ref, 'main')
+    runs-on: self-hosted
+    steps:
+      - name: Send Slack notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: rustici-ops
+          SLACK_USERNAME: cc-deployment-public
+          SLACK_MESSAGE: ':eyes: Someone pushed changes to cc-deployment-public that may be relevant to cc-deployment-private :eyes: ${{ github.event.pull_request._links.html.href }}'

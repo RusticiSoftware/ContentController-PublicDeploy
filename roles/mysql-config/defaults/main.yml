@@ -1,0 +1,10 @@
+---
+
+# If this is set to false, then the mysql-config role won't try to create 'user'@'%' users.
+# This is primarily a workaround for certain implementations of RDS that get squirrely when we
+# try to do this, or for folks that are hand provisioning their SQL users
+
+# When in doubt, just leave it set to true and you'll be fine.
+allhostsmysql: true
+
+run_db_tasks_once: true

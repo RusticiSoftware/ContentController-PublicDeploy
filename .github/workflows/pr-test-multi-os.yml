@@ -1,0 +1,32 @@
+name: Multi-OS test
+
+on:
+  # Can't use pull_request as the trigger here because pull_request doesn't get access to the repo's secrets
+  # (see https://securitylab.github.com/research/github-actions-preventing-pwn-requests/ for details)
+  # This means that any changes you make to this test won't have any affect until the PR is merged
+  pull_request_target:
+    branches:
+      - main
+      - 4.2
+      - 5.0
+    paths:
+      - '*.yml'
+      - '*.sh'
+      - 'roles/**'
+
+permissions:
+  contents: read
+
+jobs:
+  multi-os-test:
+    uses: ./.github/workflows/workflow-run-playbook.yml
+    with:
+      branch: ${{ github.head_ref }}
+      fork: ${{ github.event.pull_request.head.repo.owner.login }}
+      playbook-and-args: -e ssh_key_path=../cc-deployment-dev/roles/qa-dev/files/cc-dev.pem run-multi-os-test.yml
+      cleanup-playbook-and-args: -i "localhost," cleanup-multi-os-test.yml
+      cleanup-repo: cc-deployment-public
+    secrets:
+      RUSTICI_SYSTEMS_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+      AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
