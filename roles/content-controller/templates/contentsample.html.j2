@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rustici Cross Domain Content Sample</title>
+
+    <!-- NOTE: Your content will need to link to these files in order to communicate with the LMS -->
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/jquery.js"></script>
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/configuration.js"></script>
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/lz-string.min.js"></script>
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/minify.json.js"></script>
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/UtilityFunctions.js"></script>
+    <script language="javascript" src="//{{ ServerName }}/sdxd/SCORMDriverXD_CS/SCORMDriverXD_CS.js"></script>
+    <script>
+    	var MatchingResp = new MatchingResponse('a','b','c');
+    	var ResponseIdn = new ResponseIdentifier('a','answer a');
+    </script>
+</head>
+<body>
+    <br>
+    <p>This is remote content served from a different domain... </p>
+
+    <input type="button" name="bA3" value="GetStudentId" onclick="alert(SD.GetStudentID());">
+    <br />
+    <input type="button" name="bA3" value="GetStudentName" onclick="alert(SD.GetStudentName());">
+    <br />
+    <input type="button" name="bA2" value="SetScore" onclick="SD.SetScore(80, 100, 0);">
+    <br />
+    <input type="button" name="bA3" value="GetScore (after setting it)" onclick="alert(SD.GetScore());">
+    <br />
+    <input type="button" name="bA2" value="SetPassed" onclick="SD.SetPassed();">
+    <br />
+    <input type="button" name="bA2" value="SetComplete/ReachedEnd" onclick="SD.SetReachedEnd();">
+    <br />
+    <input type="button" name="bA3" value="GetStatus (after setting it)" onclick="alert(SD.GetStatus());">
+    <br />
+    <input type="button" name="bA2" value="SetSuspendData" onclick="SD.SetSuspendData('test suspend data');">
+    <br />
+    <input type="button" name="bA3" value="GetSuspendData (after setting it)" onclick="alert(SD.GetSuspendData());">
+    <br />
+    <input type="button" name="bA2" value="SetBookmark" onclick="SD.SetBookmark('test bookmark');">
+    <br />
+    <input type="button" name="bA3" value="GetBookmark (after setting it)" onclick="alert(SD.GetBookmark());">
+    <br />
+    <hr />
+    <input type="button" value="Record True False Interaction - 1" onclick="SD.RecordTrueFalseInteraction('tf_123',true,true,true,'interaction description',1,1,'lo_123');">
+    <br />
+    <input type="button" value="Record True False Interaction - 2" onclick="SD.RecordTrueFalseInteraction('tf_456',false,true,true,'interaction description 2',1,1,'lo_123');">
+    <br />
+    <input type="button" value="Record Multiple Choice Interaction" onclick="SD.RecordMultipleChoiceInteraction('mc_123','a',true, 'a','interaction description',1,1,'lo_123');">
+    <br />
+    <input type="button" value="Record FillIn Interaction" onclick="SD.RecordFillInInteraction('abc125', 'correct-response', true, 'correct-response', 'Fill In Description', 1, 0, 'strLearningObjectiveID');">
+    <br />
+    <input type="button" value="Record Matching Interaction" onclick="SD.RecordMatchingInteraction('abc321',MatchingResp, true, MatchingResp, 'interaction description', 1, 0, 'strLearningObjectiveID');">
+    <br />
+    <input type="button" value="Record Performance Interaction" onclick="SD.RecordPerformanceInteraction('abc543', 'response', true, 'response', 'interaction description', 1, 0, 'strLearningObjectiveID');">
+    <br />
+    <input type="button" value="Record Sequencing Interaction" onclick="SD.RecordSequencingInteraction('abc654', ResponseIdn, true, ResponseIdn, 'interaction description', 1, 0, 'strLearningObjectiveID');">
+    <br />
+    <input type="button" value="Record Likert Interaction" onclick="SD.RecordLikertInteraction('abc087', 'response', true, 'response', 'interaction description', 1, 0, 'strLearningObjectiveID');">
+    <br />
+    <input type="button" value="Record Numeric Interaction" onclick="SD.RecordNumericInteraction('num_123',1,true, 1,'interaction description',1,1,'lo_123');">
+    <br />
+    <hr />
+    <br />
+    <input type="button" name="bA3" value="Commit Data" onclick="SD.CommitData();">
+    <br />
+    <br />
+    <input type="button" name="bA" value="ConcedeControl (Exit Course)" onclick="SD.ConcedeControl();">
+    <br />
+    <br />
+</body>
+</html>
