@@ -1,0 +1,15 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat 8 variants"
+  copy:
+    src: "epel-release-latest-8.noarch.rpm"
+    dest: "/tmp/epel-release-latest-8.noarch.rpm"
+
+- name: Install GPG key
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
