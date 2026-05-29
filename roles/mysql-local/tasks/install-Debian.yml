@@ -1,0 +1,79 @@
+---
+- name: Install MySQL 8.4 packages
+  apt:
+    name:
+      - "mysql-server={{ mysql_version }}*"
+      - "mysql-client={{ mysql_version }}*"
+    state: latest
+    update_cache: yes
+  notify: restart mysql
+  when: ansible_architecture == "x86_64" and mysql_version == "8.4"
+
+# Default fallback for ARM64 installations, or when mysql_version is 8.0
+# This ensures that we'll always install MySQL (primarily for dev instances)
+# While QA / MH pick up the above, and Intel devs still get a MySQL install.
+- name: Install MySQL 8.0 packages (ARM64)
+  apt:
+    name:
+      - "mysql-server=8.0*"
+      - "mysql-client=8.0*"
+    state: latest
+    update_cache: yes
+  notify: restart mysql
+  when: ansible_architecture != "x86_64" or mysql_version == "8.0"
+
+- name: Install other packages
+  package: name={{ item }} state=present
+  with_items:
+    - libmariadb-java
+
+- name: Bind MySQL server to all interfaces
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^bind-address" line='bind-address = 0.0.0.0'
+  notify: restart mysql
+
+- name: Set MySQL server variables
+  lineinfile: dest=/etc/mysql/mysql.conf.d/mysqld.cnf regexp="^{{ item.property }}" line='{{ item.property }} = {{ item.value }}'
+  notify: restart mysql
+  with_items:
+    - { property: "sql_mode", value: "NO_ENGINE_SUBSTITUTION" }
+    - { property: "log_bin_trust_function_creators", value: "1" }
+  register: mysql_variables
+
+- name: Enable mysql_native_password (Oracle MySQL 8.4 / amd64)
+  lineinfile:
+    dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^mysql_native_password"
+    line: "mysql_native_password = ON"
+  notify: restart mysql
+  when: ansible_architecture == "x86_64" and mysql_version == "8.4"
+
+- name: Remove legacy default authentication plugin setting
+  lineinfile:
+    dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^default_authentication_plugin"
+    state: absent
+  notify: restart mysql
+  when: ansible_architecture == "x86_64" and mysql_version == "8.4"
+
+- name: Enable/disable MySQL binary logging state
+  vars:
+    _mysql_disable_logs: "{{ mysql_disable_binary_logs | default(false) | bool }}"
+  lineinfile:
+    dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: "^disable-log-bin"
+    line: "disable-log-bin"
+    insertafter: "^sql_mode"
+    state: "{{ 'present' if _mysql_disable_logs else 'absent' }}"
+  notify: restart mysql
+
+- name: Start MySQL Server
+  service:
+    name: "{{ mysql_daemon }}"
+    # To avoid restarting the service unnecessarily, we should only restart
+    # MySQL if the previous step actually changed something.
+    state: "{{ mysql_variables.changed | ternary('restarted', 'started') }}"
+    enabled: true
+
+- name: Run MySQL upgrade tool
+  shell: mysql_upgrade
+  ignore_errors: true
