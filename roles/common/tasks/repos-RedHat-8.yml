@@ -1,0 +1,44 @@
+---
+- name: "Copy over rpm for EPEL Repository for RedHat 8 variants"
+  copy:
+    src: "epel-release-latest-8.noarch.rpm"
+    dest: "/tmp/epel-release-latest-8.noarch.rpm"
+
+- name: Install GPG key
+  rpm_key:
+    key: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}
+    state: present
+
+- name: Remove previous MySQL yum repo
+  yum:
+    name: mysql-community-release-el7-5.noarch
+    state: absent
+
+- name: Set MySQL community release RPM suffix for EL{{ ansible_distribution_major_version }}
+  set_fact:
+    mysql_el_repo_suffix: "{{ ansible_distribution_major_version }}-1"
+
+- name: Fetch MySQL community release RPM
+  get_url:
+    url: "https://repo.mysql.com/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_el_repo_suffix }}.noarch.rpm"
+    dest: "/tmp/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_el_repo_suffix }}.noarch.rpm"
+    mode: "0644"
+
+- name: Import MySQL RPM signing keys
+  rpm_key:
+    key: "{{ item }}"
+    state: present
+  loop:
+    - https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+    - https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+    - https://repo.mysql.com/RPM-GPG-KEY-mysql-2025
+
+- name: Install MySQL community YUM/DNF repository
+  yum:
+    name: "/tmp/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_el_repo_suffix }}.noarch.rpm"
+    state: present
+
+- name: Cleanup temporary RPM
+  file:
+    path: "/tmp/mysql{{ mysql_version | regex_replace('\\.', '') }}-community-release-el{{ mysql_el_repo_suffix }}.noarch.rpm"
+    state: absent

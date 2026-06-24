@@ -1,0 +1,16 @@
+---
+
+  - name: Copy over der file
+    copy: src={{ cloudfront_private_key }} dest={{ cc_deploy_path }}/bin/{{ cloudfront_private_key }} owner=root group=tomcat mode=0640
+    when: use_cloudfront is defined and use_cloudfront|bool == True
+
+
+  - name: Copy over pem public key
+    copy: src={{ cloudfront_public_key }} dest={{ cc_deploy_path }}/bin/{{ cloudfront_public_key }} owner=root group=tomcat mode=0640
+    when: use_cloudfront is defined and use_cloudfront|bool == True
+
+
+  - name: Include local content proxy
+    include_role:
+      name: local-content-proxy
+    when: content_proxy_enabled is defined and content_proxy_enabled|bool == True
