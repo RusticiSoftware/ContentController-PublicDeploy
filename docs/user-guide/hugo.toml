@@ -1,0 +1,52 @@
+baseURL = 'https://guide.contentcontroller.com'
+languageCode = 'en-us'
+title = 'Content Controller'
+theme = 'rustici-docs-hugo-theme'
+disableKinds = ['taxonomy', 'term']
+
+[[menu.main]]
+identifier = "getting-started"
+name = "Getting Started"
+weight = 6
+
+[[menu.main]]
+identifier = "content"
+name = "Content"
+weight = 7
+
+[[menu.main]]
+identifier = "content-portal"
+name = "Content Portal"
+weight = 8
+
+[[menu.main]]
+identifier = "accounts"
+name = "Accounts"
+weight = 9
+
+[[menu.main]]
+identifier = "reports"
+name = "Reports"
+weight = 10
+
+[[menu.main]]
+identifier = "settings"
+name = "Settings"
+weight = 11
+
+[[menu.main]]
+identifier = "integrations"
+name = "Integrations"
+weight = 12
+
+[[menu.main]]
+identifier = "spacer"
+weight = 13
+
+[[menu.main]]
+name = "Back to Rustici ↗"
+url = "https://rusticisoftware.com/"
+weight = 16
+
+[params]
+logo = "/images/cc-logo.png"
