@@ -1,0 +1,231 @@
+---
+  - name: Gather heap size settings
+    set_fact:
+      engine_heap_size_sanitized: "{{ engine_heap_size | regex_replace('[gG]', '000') | regex_replace('[mM]', '') }}"
+      cc_heap_size_sanitized: "{{ cc_heap_size | regex_replace('[gG]', '000') | regex_replace('[mM]', '') }}"
+
+  - name: Validate heap size settings
+    fail:
+      msg: "cc_heap_size and engine_heap_size are set to a combined size of {{ cc_heap_size_sanitized|int + engine_heap_size_sanitized|int }} MB, which is more than the available {{ ansible_memory_mb.real.total }} MB on the server "
+    when: (cc_heap_size_sanitized|int + engine_heap_size_sanitized|int > ansible_memory_mb.real.total) and not building_ami
+
+  - name: Validate deep linking secret setting
+    fail:
+      msg: "deep_linking_secret is not defined. The configuration setting must be configured for CC 3.3+ installations."
+    when: is_3p3_or_later|bool == true and deep_linking_secret is not defined
+
+  - name: Validate launcher link SSO secret setting
+    fail:
+      msg: "launcherSso.secretsEncryptionKey is not defined. The configuration setting must be configured for CC 5.0+ installations with Launcher Links enabled."
+    when:
+      - is_5p0_or_later|bool == true
+      - use_launcher_link|bool == true
+      - launcherSso is not defined or launcherSso.secretsEncryptionKey is not defined
+
+  - name: Gather AWS EC2 instance facts
+    amazon.aws.ec2_metadata_facts: {}
+    ignore_errors: true
+
+  - name: Say what we are up to
+    debug: msg="Environment is {{ env }}.  Server name is {{ ServerName }}.  Operating system is {{ ansible_os_family}} / {{ ansible_distribution }}."
+
+  - name: Include OS-specific variables
+    include_vars: "{{ ansible_os_family }}.yml"
+
+  # Drop all Oracle MySQL apt snippets so we only define repo.mysql.com once (apt errors if the same
+  # URIs/suite/component appear with different Signed-By paths (mysql.asc vs mysql-repository.asc).
+  - name: Remove legacy / conflicting MySQL apt sources and keyrings
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - /etc/apt/sources.list.d/mysql-80.list
+      - /etc/apt/sources.list.d/mysql-80.sources
+      - /etc/apt/sources.list.d/mysql.list
+      - /etc/apt/sources.list.d/mysql-community.sources
+      - /etc/apt/sources.list.d/mysql.sources
+      - /etc/apt/keyrings/mysql-80.asc
+      - /etc/apt/keyrings/mysql-repository.asc
+      - /etc/apt/keyrings/mysql.asc
+    when: ansible_os_family == 'Debian'
+
+  - name: Update apt cache (Debian/Ubuntu)
+    apt:
+      update_cache: yes
+      cache_valid_time: 3600
+      update_cache_retries: 5
+      update_cache_retry_max_delay: 12
+    when: ansible_os_family == 'Debian'
+    register: apt_update_result
+    failed_when: false
+
+  - name: Run OS repository setup tasks
+    include_tasks: "repos-{{ ansible_os_family }}.yml"
+
+  - name: Display apt cache update error details
+    debug:
+      msg: "Apt cache update failed. Error: {{ apt_update_result.msg | default('Unknown error') }}. Stderr: {{ apt_update_result.stderr | default('No stderr') }}. RC: {{ apt_update_result.rc | default('N/A') }}"
+    when: ansible_os_family == 'Debian' and apt_update_result.failed
+
+  - name: Check apt cache update result
+    fail:
+      msg: |
+        Failed to update apt cache on {{ inventory_hostname }}.
+        This usually indicates:
+        - Network connectivity issues (can't reach apt repositories)
+        - DNS resolution problems (DNS test result: {{ 'PASSED' if dns_test.rc == 0 else 'FAILED' }})
+        - Repository configuration errors
+        - Firewall blocking outbound connections
+        
+        Please check:
+        1. Network connectivity: Can the host reach the internet?
+        2. DNS resolution: Can the host resolve repository hostnames?
+        3. Repository configuration: Are the apt sources properly configured?
+        4. Firewall rules: Are outbound connections to apt repositories allowed?
+        
+        You can manually test by running 'apt-get update' on the target host.
+    when: ansible_os_family == 'Debian' and apt_update_result.failed
+
+  - name: Install packages (Debian/Ubuntu)
+    apt:
+      name: "{{ common_packages + common_platform_packages }}"
+      state: latest
+      update_cache: no
+    when: ansible_os_family == 'Debian'
+
+  - name: Install packages (RedHat)
+    package:
+      name: "{{ common_packages + common_platform_packages }}"
+      state: latest
+      update_cache: yes
+    when: ansible_os_family == 'RedHat'
+
+  - name: Run OS repository setup tasks
+    include_tasks: "repos-{{ ansible_os_family }}.yml"
+
+  # Packages we don't need for RH 8, but do need for Debian/RH 7
+  - name: Install ntp
+    package:
+      name: ntp
+      state: latest
+      update_cache: yes
+    when: ansible_os_family == 'Debian' or ansible_distribution_major_version == "7"
+
+  # MySQL-python only works on RH 7
+  - name: Install MySQL-python
+    package:
+      name: "MySQL-python"
+      state: latest
+      update_cache: yes
+    when: ansible_os_family == 'RedHat' and ansible_distribution_major_version == "7"
+
+  - name: Install pip3
+    package:
+      name: python3-pip
+      state: present
+    when: ansible_os_family == 'Debian'
+
+  - name: Sleep for a few seconds to allow the previous command to finish its business
+    pause: seconds=5
+
+  # Ubuntu 23.04+ uses PEP 668 compliant packages, meaning we can no longer pip install
+  # unless opting into using the --break-system-packages flag.
+  - name: Install boto3 via OS packages
+    package:
+      name:
+        - python3-boto3
+        - python3-botocore
+      state: present
+    when: ansible_os_family == 'Debian'
+
+  - name: Install boto3 via pip
+    pip:
+      name: [boto3, botocore]
+      state: present
+      executable: pip3
+    when: ansible_os_family == 'RedHat'
+
+  - name: install futures if necessary
+    pip:
+      name:
+        - futures
+      state: latest
+    # This is expected to fail when run using Python 3, but we need this to support Python 2 installation
+    ignore_errors: true
+
+  - name: install PyMySQL
+    pip:
+      name:
+        - PyMySQL
+      state: latest
+    when: ansible_os_family == 'RedHat' and ansible_distribution_major_version in ["8", "9"]
+
+  - name: Install cronjobs
+    # Common cronjobs will run out of /etc/cron.d/ansible-jobs
+    cron: name="update NTP" cron_file="ansible-jobs" user=root minute="0" hour="10" job="/usr/sbin/ntpdate -u pool.ntp.org"
+    # ntp is not supported on RedHat/CentOS 8
+    when: ansible_os_family == 'Debian' or ansible_distribution_major_version == "7"
+
+  - name: Set timezone to UTC
+    action: shell echo Etc/UTC > /etc/timezone
+
+  - name: Set localtime to UTC
+    file: src=/usr/share/zoneinfo/Etc/UTC dest=/etc/localtime
+
+  - name: Reconfigure tzdata
+    action: command dpkg-reconfigure -f noninteractive tzdata
+    when: ansible_os_family == 'Debian'
+
+  - name: MIME Types File
+    template: src=mime.types dest=/etc/mime.types mode=0644
+
+  - name: Disable reverse DNS lookups on the SSH daemon
+    lineinfile:
+      dest: /etc/ssh/sshd_config
+      regexp: ^UseDNS
+      line: UseDNS no
+      state: present
+    notify:
+      - restart ssh
+      - restart sshd
+
+  - name: Copy over Amazon Inspector GPG key
+    copy:
+      src: inspector.gpg
+      dest: /root/inspector.gpg
+      mode: 0400
+      owner: root
+      group: root
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: import Amazon GPG key
+    command: gpg --import /root/inspector.gpg
+    register: gpgimport
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon sig file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install.sig
+      dest: /root/install.sig
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: fetch the amazon inspector install file
+    get_url:
+      url: https://d1wk0tztpsntt1.cloudfront.net/linux/latest/install
+      dest: /root/install
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  # If this fails, it exits(1) and kills the ansible build, which is desired, as if it fails it means the inspector binary is tainted
+  - name: verify the sig file
+    command: gpg --verify /root/install.sig
+    register: sigfile
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: install the AWS inspector agent
+    command: bash /root/install
+    become: yes
+    when: ansible_ec2_instance_type is defined and ( aws_inspector is defined and aws_inspector|bool == true )
+
+  - name: disable unattended upgrades
+    apt: name=unattended-upgrades state=absent purge=true
+    when: disable_unattended_upgrades is defined and disable_unattended_upgrades|bool == true

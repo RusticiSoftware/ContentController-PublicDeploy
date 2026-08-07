@@ -1,0 +1,48 @@
+name: Push Public Deploy Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: cc-deployment-public branch to publish from
+        required: true
+        type: string
+      release:
+        description: Release branch name to push to ContentController-PublicDeploy
+        required: true
+        type: string
+
+env:
+  GITHUB_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+permissions:
+  contents: read
+
+jobs:
+  push-public-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Check out cc-deployment-public
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          token: ${{ env.GITHUB_TOKEN }}
+
+      - name: Create release branch and push to ContentController-PublicDeploy
+        env:
+          BRANCH: ${{ inputs.branch }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout --orphan "${BRANCH}"
+          git checkout -b "${RELEASE}"
+
+          rm -f .gitmodules && touch .gitmodules
+          git add .gitmodules
+          git commit -m "${RELEASE} Release"
+
+          git remote add public-deploy "https://x-access-token:${GITHUB_TOKEN}@github.com/RusticiSoftware/ContentController-PublicDeploy.git"
+          git push public-deploy "${RELEASE}"

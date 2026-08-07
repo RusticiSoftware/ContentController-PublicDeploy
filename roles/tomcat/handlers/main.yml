@@ -1,0 +1,12 @@
+---
+
+  - name: start tomcat
+    action: service name=tomcat state=started
+    notify: restart httpd
+
+  - name: restart tomcat
+    action: service name=tomcat state=restarted
+    notify: restart httpd
+
+  - name: stop tomcat
+    action: service name=tomcat state=stopped

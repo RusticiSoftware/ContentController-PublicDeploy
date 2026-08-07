@@ -1,0 +1,163 @@
+# Creates an RDS instance, lots of blank EC2 instances in different configurations, and deploys
+# Content Controller to them all.  Then, it waits for the boxes to come up and makes sure the
+# healthchecks pass.  The goal here is to make sure as many of the code paths in the playbooks
+# are covered.
+#
+# Ran by PITA's `PR-cc-deployment-public` job.
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/aws.yml
+    - host_vars/star.contentcontroller.net.yml
+  tasks:
+    - name: Launch RDS instance
+      amazon.aws.rds_instance:
+        backup_retention_period: 0
+        engine: "mysql"
+        engine_version: "8.0.43"
+        db_instance_identifier: deploy-test-db
+        db_instance_class: db.t4g.small
+        db_parameter_group_name: content-controller-parameters-80
+        username: "{{ mysql_root_user }}"
+        password: "{{ mysql_root_password }}"
+        region: "{{ aws_region }}"
+        allocated_storage: 20
+        db_subnet_group_name: primary-subnet-group
+        vpc_security_group_ids: 
+          - "sg-cc904cbb"
+        state: present
+        wait: yes
+        # wait_timeout: 780 - Note from docs: At a later time a wait_timeout option may be added.
+        tags:
+          application: Content Controller
+          job: PR-cc-deployment-public
+      register: rds_instance
+
+    - name: Launch EC2 instances
+      amazon.aws.ec2_instance:
+        network_interfaces:
+          - assign_public_ip: false
+        region: "{{ aws_region }}"
+        key_name: "{{ ssh_key }}"
+        security_group: "{{ ami_build_security_group_id }}"
+        instance_type: "{{ instance_size }}"
+        vpc_subnet_id: "{{ ami_build_vpc_subnet_id }}"
+        image_id: "{{ item.image }}"
+        wait: yes
+        wait_timeout: 500
+        volumes:
+          - device_name: /dev/sda1
+            ebs:
+              volume_type: gp2
+              volume_size: 10
+              delete_on_termination: true
+        tags:
+          Name: "deploy-test | {{ item.name }}"
+          application: Content Controller
+          job: PR-cc-deployment-public
+      register: ec2_instances
+      with_items:
+        - { name: "Ubuntu 20 - Remote DB - MySQL 8", image: "ami-0b93ce03dcbcb10f6", ssh_user: "ubuntu", db_host: "deploy-test-db.crfjaf2iqz5i.us-east-1.rds.amazonaws.com", db_suffix: "_u20", mysql_version: "8.0", use_python3: true }
+        - { name: "Ubuntu 20 - Local DB - MySQL 8", image: "ami-0b93ce03dcbcb10f6", ssh_user: "ubuntu", db_host: "localhost", db_suffix: "", mysql_version: "8.0", use_python3: true }
+        - { name: "Ubuntu 22.04 - Local DB - MySQL 8", image: "ami-0030e4319cbf4dbf2", ssh_user: "ubuntu", db_host: "localhost", db_suffix: "", mysql_version: "8.0", use_python3: true }
+        - { name: "RHEL 9 - Local DB - MySQL 8", image: "ami-0b112ae24c8e415a5", ssh_user: "ec2-user", db_host: "localhost", db_suffix: "", mysql_version: "8.0", use_python3: true }
+      async: 300
+      poll: 5
+
+    - name: Wait for SSH to start
+      wait_for:
+        port: 22
+        host: "{{ item.instances.0.private_dns_name }}"
+        timeout: 300
+        search_regex: OpenSSH
+      with_items: "{{ ec2_instances.results }}"
+
+    - name: Save host to group
+      add_host:
+        name: "{{ item.item.name }}"
+        ansible_host: "{{ item.instances.0.private_dns_name }}"
+        ansible_user: "{{ item.item.ssh_user }}"
+        ansible_ssh_private_key_file: "{{ ssh_key_path }}"
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_python_interpreter: "{{ '/usr/bin/python3' if item.item.use_python3 else '/usr/bin/python' }}"
+        cc_db_host: "{{ item.item.db_host }}"
+        mysql_version: "{{ item.item.mysql_version }}"
+        groups: test_hosts
+        run_db_tasks_once: false
+        cc_db_name: "contentcontroller{{ item.item.db_suffix }}"
+        cc_db_username: "ccontroller{{ item.item.db_suffix }}"
+        engine_db_name: "ScormEngineDB{{ item.item.db_suffix }}"
+        engine_db_username: "scormengine{{ item.item.db_suffix }}"
+        ami: "{{ item.item.image }}"
+      with_items: "{{ ec2_instances.results }}"
+
+# Run provisioning roles against the newly provisioned servers (copied from env.yml)
+- hosts: test_hosts
+  become: true
+  force_handlers: True
+  gather_facts: false
+  pre_tasks:
+    # Set ServerName variable for use as CC's domain name
+    - name: Set ServerName with EC2's internal VPC hostname
+      set_fact:
+        ServerName: "{{ hostvars[inventory_hostname].ansible_host|default(inventory_hostname) }}"
+    - name: Install Ansible dependencies
+      raw: >
+        if [ -e /usr/bin/apt ]; then 
+            (apt-get -y update && export DEBIAN_FRONTEND=noninteractive && apt-get install -y python3 aptitude); 
+        elif [ -e /usr/bin/dnf ]; then 
+            (dnf -y install python3);
+        elif [ -e /usr/bin/yum ]; then 
+            (yum -y install python3); 
+        fi;
+      changed_when: false
+
+    - setup:
+  vars_files:
+    - group_vars/engine_java.yml
+    - group_vars/content_controller.yml
+    - group_vars/s3.yml
+    - group_vars/cloudfront.yml
+    - group_vars/keypair.yml
+    - host_vars/star.contentcontroller.net.yml
+  roles:
+    - common
+    - java
+    - { role: fips, when: fips_support_enabled == True }
+    - tomcat
+    - ssl
+    - mnt
+    - { role: mysql-local, when: cc_db_host == "localhost" }
+    - { role: mysql-config, when: initialize_mysql }
+    - apache
+    - content-controller
+    - cc-scorm-engine
+    - { role: cloudfront, when: use_cloudfront is defined and use_cloudfront|bool == True }
+    - { role: newrelic, when: newrelic_license_key is defined }
+
+# Run and validate health checks to make sure the servers deployed correctly
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Wait for 15 seconds to make sure services have to come up
+      pause: seconds=15
+
+    - name: Run Content Controller health checks
+      uri:
+        url: http://{{ hostvars[item].ansible_host }}/healthcheck
+        method: GET
+        status_code: 200
+        validate_certs: no
+      register: healthchecks
+      with_items: "{{ groups.test_hosts }}"
+
+    - name: Ensure the health checks passed
+      assert:
+        that:
+          - "item.json.deadlocks.healthy == true"
+          - "item.json.engine.healthy == true"
+          - "item.json.mysql.healthy == true"
+          - "item.json['mysql-hardmode']['healthy'] == true"
+        msg: "Health checks failed for {{ item.item }}"
+      with_items: "{{ healthchecks.results }}"
