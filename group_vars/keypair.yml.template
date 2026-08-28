@@ -1,0 +1,8 @@
+---
+
+#In order to download releases of Content Controller, you'll need to have a keypair 
+#(The folks at Rustici will provide you with a keypair to use)
+
+s3_download_key: 
+s3_download_secret: 
+use_s3_release: true

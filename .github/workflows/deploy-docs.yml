@@ -1,0 +1,85 @@
+# Rebuilds and deploys all docs (including the API docs) under docs.contentcontroller.com
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      CC_VERSION:
+        description: "The version of Content Controller to build the API docs for (Leave blank to use the default branch)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-docs:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Content Controller
+        uses: actions/checkout@v4
+        with:
+          repository: RusticiSoftware/ContentController
+          path: ContentController
+          ref: ${{ inputs.CC_VERSION }}
+          token: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.145.0'
+          extended: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+
+      - name: Build self-hosting docs
+        working-directory: docs/self-hosting
+        run: hugo --minify
+
+      - name: Build integration docs
+        working-directory: docs/integration
+        run: hugo --minify
+
+      - name: Build user-guide docs
+        working-directory: docs/user-guide
+        run: hugo --minify
+
+      - name: Build automation API docs
+        run: |
+          set -euo pipefail
+
+          OUT_DIR="docs/automation-api/v1"
+
+          rm -rf "${OUT_DIR}"
+          mkdir -p "${OUT_DIR}"
+
+          WORKDIR="$(mktemp -d)"
+          trap 'rm -rf "${WORKDIR}"' EXIT
+          (
+            cd "${WORKDIR}"
+            npm pack swagger-ui-dist@5.32.8 >/dev/null
+            tar -xzf swagger-ui-dist-*.tgz
+          )
+          cp -R "${WORKDIR}/package/." "${OUT_DIR}/"
+          cp ContentController/service/code-gen/index.html \
+             ContentController/service/code-gen/definitions/cc-public-api.yml \
+             "${OUT_DIR}/"
+
+      - name: Create docs bundle
+        run: |
+          mkdir -p bundle/docs
+          cp docs/index.html docs/cc-logo.png bundle/docs/
+          cp -r docs/self-hosting/public/ bundle/docs/self-hosting/
+          cp -r docs/integration/public/ bundle/docs/integration/
+          cp -r docs/automation-api/ bundle/docs/automation-api/
+          cp -r docs/user-guide/public/ bundle/guide/
+
+      - name: Update public docs on S3
+        run: |
+          aws s3 sync bundle/ s3://${{ secrets.DEPLOY_DOCS_BUCKET }}/ --delete
