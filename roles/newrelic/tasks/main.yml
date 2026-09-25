@@ -1,0 +1,40 @@
+---
+
+  - name: Create New Relic Directory
+    file: dest="{{ tomcat_base }}/newrelic" owner=tomcat group=tomcat state=directory mode=0755
+
+  - name: install new-relic-jar ( SCORM Engine )
+    copy: src=newrelic.jar dest="{{ tomcat_base }}/newrelic/newrelic.jar"
+
+  - name: install new-relic-jar ( Content Controller )
+    copy: src=newrelic.jar dest="{{ cc_deploy_path }}/newrelic.jar"
+    when: cc_deploy_path is defined
+
+  - name: install NewRelic.yml (SCORM Engine)
+    template: src=newrelic.engine.yml dest="{{ tomcat_base }}/newrelic/newrelic.yml"
+    notify:
+      - restart tomcat
+
+  - name: install NewRelic.yml (ContentController)
+    template: src=newrelic.cc.yml dest="{{ cc_deploy_path }}/newrelic.yml"
+    notify:
+      - restart contentcontroller
+    when: cc_deploy_path is defined
+
+  - name: Edit catalina.sh to enable APM agent in tomcat
+    lineinfile: 
+      dest: "{{ tomcat_base }}/bin/catalina.sh"
+      line: 'export JAVA_OPTS="$JAVA_OPTS -javaagent:/usr/share/tomcat/newrelic/newrelic.jar"'
+      state: present
+      insertafter: ^JAVA_OPTS
+    notify: restart tomcat
+
+  - name: Edit contentcontroller-service script to enable APM
+    lineinfile: 
+      dest: "{{ cc_deploy_path }}/bin/contentcontroller-service"
+      line: 'export JAVA_OPTS="$JAVA_OPTS -javaagent:/var/lib/contentcontroller/newrelic.jar"'
+      state: present
+      insertafter: ^DEFAULT_JVM_OPTS
+    when: cc_deploy_path is defined
+    notify: restart contentcontroller
+

@@ -1,0 +1,126 @@
+name: Run Test Playbook
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: Which cc-deployment-public branch to use
+        required: true
+        type: string
+      fork:
+        description: Whose forks of the repo should be used (make sure that rustici-systems has access)
+        required: true
+        type: string
+      playbook-and-args:
+        description: Which playbook should be run to test this PR, including any extra CLI arguments needed
+        required: true
+        type: string
+      cleanup-playbook-and-args:
+        description: Which playbook should be run to clean up after ourselves, including any extra CLI arguments needed
+        required: true
+        type: string
+      cleanup-repo:
+        description: Which repo has the cleanup playbook
+        required: true
+        type: string
+
+    secrets:
+      RUSTICI_SYSTEMS_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  GITHUB_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+jobs:
+  run-playbook:
+    runs-on: self-hosted
+
+    steps:
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: |
+        echo "$GITHUB_CONTEXT"
+
+    - name: Check out cc-deployment-public
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ inputs.fork }}/cc-deployment-public
+        ref: ${{ inputs.branch }}
+        path: cc-deployment-public
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: Check out cc-deployment-dev
+      uses: actions/checkout@v3
+      with:
+        repository: RusticiSoftware/cc-deployment-dev
+        ref: master
+        path: cc-deployment-dev
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: Symlink -dev into -public
+      working-directory: ./cc-deployment-public
+      run: ./link-vars-dev.sh
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11.x'
+
+    - name: Install pip, Ansible, and AWS CLI
+      run: |
+        sudo apt install -y python3-pip
+        pip install Jinja2==3.1.6 ansible==11.7.0 boto boto3 botocore awscli==1.41.17
+    
+    - name: Install Ansible AWS collection
+      run: ansible-galaxy collection install amazon.aws
+
+    - name: Invoke deployment playbook
+      working-directory: ./cc-deployment-public
+      run: |
+        chmod 0600 ../cc-deployment-dev/roles/qa-dev/files/cc-dev.pem
+        python3 ~/.local/bin/ansible-playbook -e ansible_python_interpreter=/usr/bin/python3 -e ssh_key_path=../cc-deployment-dev/roles/qa-dev/files/cc-dev.pem ${{ inputs.playbook-and-args }}
+
+  cleanup:
+    needs: [run-playbook]
+    runs-on: self-hosted
+    if: always()
+    steps:
+    - name: Check out cc-deployment-public
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ inputs.fork }}/cc-deployment-public
+        ref: ${{ inputs.branch }}
+        path: cc-deployment-public
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: Check out cc-deployment-dev
+      uses: actions/checkout@v3
+      with:
+        repository: RusticiSoftware/cc-deployment-dev
+        ref: master
+        path: cc-deployment-dev
+        token: ${{ env.GITHUB_TOKEN }}
+
+    - name: Symlink -dev into -public
+      working-directory: ./cc-deployment-public
+      run: ./link-vars-dev.sh
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11.x'
+
+    - name: Install pip, Ansible, and AWS CLI
+      run: |
+        sudo apt install -y python3-pip
+        pip install Jinja2==3.1.6 ansible==11.7.0 boto boto3 botocore awscli==1.41.17
+
+    - name: Install Ansible AWS collection
+      run: ansible-galaxy collection install amazon.aws
+
+    - name: Invoke cleanup playbook
+      working-directory: ./${{ inputs.cleanup-repo }}
+      run: |
+        python3 ~/.local/bin/ansible-playbook -e ansible_python_interpreter=/usr/bin/python3 ${{ inputs.cleanup-playbook-and-args }}

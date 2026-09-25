@@ -1,0 +1,28 @@
+---
+# Clean up
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/aws.yml
+  tasks:
+    - name: Lookup EC2 instances
+      amazon.aws.ec2_instance_info:
+        region: "{{ aws_region }}"
+        filters:
+          "tag:application": Content Controller
+          "tag:job": PR-cc-deployment-public
+      register: ec2_instances
+
+    - name: Terminate EC2 instances
+      amazon.aws.ec2_instance:
+        state: absent
+        region: "{{ aws_region }}"
+        instance_ids: "{{ ec2_instances.instances | map(attribute='instance_id') | list }}"
+      when: ec2_instances.instances | length > 0
+
+    - name: Terminate RDS instance
+      amazon.aws.rds_instance:
+        state: absent
+        db_instance_identifier: deploy-test-db
+        region: "{{ aws_region }}"
+        skip_final_snapshot: true
