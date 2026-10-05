@@ -1,0 +1,140 @@
+# Rebuilds and deploys all docs (including the API docs) under docs.contentcontroller.com
+#
+# Auto-selected refs open a GitHub issue assigned to the requester. Approve with a
+# comment (approve / deny) or a thumbs-up reaction. Slack notify is best-effort.
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Automatically picks highest public release tag if blank. (ex: v5.0.82)."
+        required: false
+        type: string
+      api_ref:
+        description: "ContentController commit SHA for API docs. Automatically picks tag commit if blank."
+        required: false
+        type: string
+      hugo_ref:
+        description: "cc-deployment-public commit SHA for Hugo docs. Automatically picks tag commit if blank."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: self-hosted
+    outputs:
+      api_ref: ${{ steps.resolve.outputs.api_ref }}
+      api_sha_short: ${{ steps.resolve.outputs.api_sha_short }}
+      api_url: ${{ steps.resolve.outputs.api_url }}
+      hugo_sha: ${{ steps.resolve.outputs.hugo_sha }}
+      hugo_sha_short: ${{ steps.resolve.outputs.hugo_sha_short }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      hugo_url: ${{ steps.resolve.outputs.hugo_url }}
+      needs_confirm: ${{ steps.resolve.outputs.needs_confirm }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout Content Controller
+        uses: actions/checkout@v4
+        with:
+          repository: RusticiSoftware/ContentController
+          path: ContentController
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+      - name: Resolve docs refs
+        id: resolve
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+          API_REF_INPUT: ${{ inputs.api_ref }}
+          HUGO_REF_INPUT: ${{ inputs.hugo_ref }}
+          CC_REPO: ${{ github.workspace }}/ContentController
+          PUBLIC_REPO: ${{ github.workspace }}
+          PUBLIC_REPO_SLUG: ${{ github.repository }}
+        run: python3 .github/scripts/deploy-docs.py resolve
+
+  notify:
+    needs: resolve
+    if: needs.resolve.outputs.needs_confirm == 'true'
+    runs-on: self-hosted
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create approval issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+          REPO: RusticiSoftware/ContentController
+          ACTOR: ${{ github.actor }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          API_SHA_SHORT: ${{ needs.resolve.outputs.api_sha_short }}
+          API_URL: ${{ needs.resolve.outputs.api_url }}
+          HUGO_SHA_SHORT: ${{ needs.resolve.outputs.hugo_sha_short }}
+          HUGO_URL: ${{ needs.resolve.outputs.hugo_url }}
+        run: python3 .github/scripts/deploy-docs.py create-issue
+
+      - name: Send Slack notification
+        continue-on-error: true
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: cc-pita-jobs
+          SLACK_USERNAME: cc-deployment-public
+          SLACK_COLOR: warning
+          SLACK_TITLE: "Confirm docs deploy ${{ needs.resolve.outputs.tag }}"
+          SLACK_MESSAGE: >-
+            ${{ github.actor }}: confirm docs deploy.
+            Tag `${{ needs.resolve.outputs.tag }}`.
+            API ${{ needs.resolve.outputs.api_url }}
+            Docs ${{ needs.resolve.outputs.hugo_url }}
+            Approve on ${{ steps.issue.outputs.issue_url }}
+            (comment approve / deny, or thumbs-up).
+
+      - name: Wait for issue approval
+        id: wait
+        env:
+          GH_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+          REPO: RusticiSoftware/ContentController
+          ACTOR: ${{ github.actor }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.issue_number }}
+          TIMEOUT_SECONDS: "300"
+          POLL_SECONDS: "20"
+        run: python3 .github/scripts/deploy-docs.py wait
+
+      - name: Close approval issue
+        if: always() && steps.issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+          REPO: RusticiSoftware/ContentController
+          ACTOR: ${{ github.actor }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.issue_number }}
+          DECISION: ${{ steps.wait.outputs.decision }}
+          WAIT_OUTCOME: ${{ steps.wait.outcome }}
+        run: python3 .github/scripts/deploy-docs.py close
+
+  deploy:
+    name: Deploy ${{ needs.resolve.outputs.tag }} / ${{ needs.resolve.outputs.hugo_sha_short }}
+    needs: [resolve, notify]
+    if: >-
+      always()
+      && needs.resolve.result == 'success'
+      && (needs.notify.result == 'success' || needs.notify.result == 'skipped')
+    uses: ./.github/workflows/deploy-docs-build.yml
+    with:
+      api_ref: ${{ needs.resolve.outputs.api_ref }}
+      hugo_ref: ${{ needs.resolve.outputs.hugo_sha }}
+    secrets:
+      RUSTICI_SYSTEMS_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+      DEPLOY_DOCS_BUCKET: ${{ secrets.DEPLOY_DOCS_BUCKET }}

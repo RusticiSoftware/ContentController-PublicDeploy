@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css?family=Oxygen:700|Poppins:300');
+
+.hidden { display: none; }
+h1 { color: #335ca6; }
+
+.sidebar-menu {
+    background-color: #fafafa;
+    border-right: 1px solid #e0e0e0;
+    position: fixed;
+}
+
+#left-nav {
+    position: relative;
+    height: 100vh;
+
+    ul {
+        font-size: 0.9rem;
+        li {
+            a { padding: 2px 20px; }
+        }
+
+        ul {
+            .active {
+                margin-left: -1rem;
+                a { margin-left: 1rem; }
+            }
+        }
+    }
+}
+
+.active {
+    background-color: #e6e6e6;
+    padding: 8px 0;
+    margin: 0;
+}
+
+blockquote { background-color: #fafafa; }
+
+.hint-block {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
+    border-radius: 4px;
+}
+.hint-title { font-weight: bold; margin-bottom: 0.5rem; }
+
+.hint-block.info { background-color: #e3f2fd; border-color: #2196f3; color: #263238; }
+.hint-block.tip { background-color: #e8f5e9; border-color: #4caf50; color: #1b5e20; }
+.hint-block.warning { background-color: #fff3e0; border-color: #ff9800; color: #e65100; }
+.hint-block.danger { background-color: #ffebee; border-color: #f44336; color: #b71c1c; }
+.hint-block.success { background-color: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
