@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+{{- partial "docs/shared" -}}
+<html lang="{{ .Site.Language.Lang }}">
+
+<head>
+  {{ partial "docs/html-head" . }}
+</head>
+
+<body>
+  <input type="checkbox" style="display: none" id="menu-control" />
+  <main class="flex container">
+
+    <aside class="sidebar-menu fixed">
+      {{ partial "docs/menu" . }}
+    </aside>
+
+    <div class="docs-page">
+      {{ partial "docs/mobile-header" . }}
+      {{ template "main" . }}
+    </div>
+
+    {{ template "toc" . }}
+  </main>
+</body>
+
+</html>

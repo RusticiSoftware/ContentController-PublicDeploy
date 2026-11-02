@@ -1,0 +1,35 @@
+---
+
+- name: Uninstall openjdk-11
+  ansible.builtin.package:
+    name: openjdk-11-jdk
+    state: absent
+
+- name: Install prerequisites
+  ansible.builtin.package:
+    name:
+      - ca-certificates
+      - gnupg
+      - curl
+    state: present
+
+- name: Download and dearmor the Corretto GPG key
+  ansible.builtin.shell:
+    # Pipe the downloaded key directly to gpg to dearmor it.
+    cmd: "curl -fsSL https://apt.corretto.aws/corretto.key | gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg"
+    creates: /usr/share/keyrings/corretto-keyring.gpg
+  changed_when: false
+  args:
+    executable: /bin/bash
+
+- name: Add the Corretto APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main"
+    state: present
+    filename: corretto
+    update_cache: yes
+
+- name: Install Amazon Corretto {{ corretto_version }} JDK
+  ansible.builtin.package:
+    name: "java-{{ corretto_version }}-amazon-corretto-jdk"
+    state: present

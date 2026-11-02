@@ -1,0 +1,18 @@
+---
+apache_service: apache2
+apache_daemon: apache2
+apache_daemon_path: /usr/sbin/
+apache_server_root: /etc/apache2
+apache_conf_path: "{{ apache_server_root}}/conf-available"
+apache_mods_path: "{{ apache_server_root}}/mods-available"
+apache_sites_path: "{{ apache_server_root}}/sites-available"
+
+apache_logs: "/var/log/apache2"
+
+__apache_packages:
+  - apache2
+  - apache2-utils
+  - libapache2-mod-jk
+
+apache_ssl_pass_phrase_dialog: "exec:/usr/share/apache2/ask-for-passphrase"
+apache_ssl_session_cache: "shmcb:${APACHE_RUN_DIR}/ssl_scache(512000)"

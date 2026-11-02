@@ -1,0 +1,10 @@
+ServerName: "example.contentcontroller.net"
+
+tomcat_password: 'redacted password'
+mysql_root_password: 'redacted password'
+cc_db_password: 'redacted password'
+engine_db_password: 'redacted password'
+mysql_root_password: 'redacted password'
+
+# Initial user's password for the Content Controller web interface.
+cc_user_password: 'redacted password'

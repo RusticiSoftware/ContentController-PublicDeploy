@@ -1,0 +1,5 @@
+---
+common_platform_packages:
+  - vim-nox
+  - openssl
+  - python3-debian

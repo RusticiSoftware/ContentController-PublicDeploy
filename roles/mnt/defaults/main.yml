@@ -1,0 +1,7 @@
+---
+
+# The root directory where you want content to be stored.
+# For example, if you use /mnt, your content will be stored in /mnt/content
+# No trailing slash please.
+data_root: /mnt
+

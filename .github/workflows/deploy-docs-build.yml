@@ -1,0 +1,97 @@
+# Called by deploy-docs.yml after refs are resolved (and approved, when needed).
+name: Deploy Docs Build
+
+on:
+  workflow_call:
+    inputs:
+      api_ref:
+        description: ContentController tag or commit for API docs
+        required: true
+        type: string
+      hugo_ref:
+        description: cc-deployment-public commit for Hugo docs
+        required: true
+        type: string
+    secrets:
+      RUSTICI_SYSTEMS_TOKEN:
+        required: true
+      DEPLOY_DOCS_BUCKET:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Hugo docs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.hugo_ref }}
+
+      - name: Checkout Content Controller
+        uses: actions/checkout@v4
+        with:
+          repository: RusticiSoftware/ContentController
+          path: ContentController
+          ref: ${{ inputs.api_ref }}
+          token: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.145.0'
+          extended: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+
+      - name: Build self-hosting docs
+        working-directory: docs/self-hosting
+        run: hugo --minify
+
+      - name: Build integration docs
+        working-directory: docs/integration
+        run: hugo --minify
+
+      - name: Build user-guide docs
+        working-directory: docs/user-guide
+        run: hugo --minify
+
+      - name: Build automation API docs
+        run: |
+          set -euo pipefail
+
+          OUT_DIR="docs/automation-api/v1"
+
+          rm -rf "${OUT_DIR}"
+          mkdir -p "${OUT_DIR}"
+
+          WORKDIR="$(mktemp -d)"
+          trap 'rm -rf "${WORKDIR}"' EXIT
+          (
+            cd "${WORKDIR}"
+            npm pack swagger-ui-dist@5.32.8 >/dev/null
+            tar -xzf swagger-ui-dist-*.tgz
+          )
+          cp -R "${WORKDIR}/package/." "${OUT_DIR}/"
+          cp ContentController/service/code-gen/index.html \
+             ContentController/service/code-gen/definitions/cc-public-api.yml \
+             "${OUT_DIR}/"
+
+      - name: Create docs bundle
+        run: |
+          mkdir -p bundle/docs
+          cp docs/index.html docs/cc-logo.png bundle/docs/
+          cp -r docs/self-hosting/public/ bundle/docs/self-hosting/
+          cp -r docs/integration/public/ bundle/docs/integration/
+          cp -r docs/automation-api/ bundle/docs/automation-api/
+          cp -r docs/user-guide/public/ bundle/guide/
+
+      - name: Update public docs on S3
+        run: |
+          aws s3 sync bundle/ s3://${{ secrets.DEPLOY_DOCS_BUCKET }}/ --delete
