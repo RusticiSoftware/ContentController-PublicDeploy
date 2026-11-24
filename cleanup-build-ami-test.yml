@@ -1,0 +1,23 @@
+# Deletes all AMIs with the tags domain: cc.example.com and created_by: Rustici CC AMI Builder
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/aws.yml
+  tasks:
+    - name: Lookup build_ami test AMIs
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: self
+        filters:
+          "tag:domain": "cc.example.com"
+          "tag:created_by": "Rustici CC AMI Builder"
+      register: test_amis
+
+    - name: Delete test AMIs
+      amazon.aws.ec2_ami:
+        region: "{{ aws_region }}"
+        image_id: "{{ item }}"
+        delete_snapshot: true
+        state: absent
+      with_items: "{{ test_amis.images | map(attribute='image_id') | list }}"

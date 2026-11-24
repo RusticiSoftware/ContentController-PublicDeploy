@@ -1,0 +1,8 @@
+---
+common_platform_packages:
+  - emacs-nox
+  - vim-enhanced
+  - openssl
+  - openssl-devel
+  - make # Used to build zlib, when necessary
+  - redhat-rpm-config # Used to compile mod_jk, used by Apache

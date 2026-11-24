@@ -1,0 +1,17 @@
+---
+common_packages:
+  - curl
+  - git
+  - unzip
+  - kpartx
+  - gdisk
+  - libtool
+  - logwatch
+  - postfix
+  - xfsprogs
+  - zip
+  - wget
+  - nano
+  - zip
+  - unzip
+  - python3

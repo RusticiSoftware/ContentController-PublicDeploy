@@ -1,0 +1,17 @@
+---
+
+- name: Uninstall openjdk-11
+  package:
+    name: java-11-openjdk-devel
+    state: absent
+
+- name: Add Corretto YUM repository
+  become: yes
+  ansible.builtin.shell: |
+    rpm --import https://yum.corretto.aws/corretto.key
+    curl -L -o /etc/yum.repos.d/corretto.repo https://yum.corretto.aws/corretto.repo
+
+- name: Install Amazon Corretto {{ corretto_version }} JDK
+  ansible.builtin.package:
+    name: "java-{{ corretto_version }}-amazon-corretto-devel"
+    state: present

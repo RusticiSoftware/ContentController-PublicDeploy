@@ -1,0 +1,39 @@
+name: Deploy Hugo Docs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.145.0'
+          extended: true
+
+      - name: Build self-hosting docs
+        working-directory: doc
+        run: hugo --minify
+
+      - name: Build integration docs
+        working-directory: additional_doc
+        run: hugo --minify
+
+      - name: Deploy self-hosting docs to S3
+        run: |
+          aws s3 sync doc/public/ s3://docs.contentcontroller.com/self-hosting/ \
+            --delete
+
+      - name: Deploy integration docs to S3
+        run: |
+          aws s3 sync additional_doc/public/ s3://docs.contentcontroller.com/integration/ \
+            --delete

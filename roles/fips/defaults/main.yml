@@ -1,0 +1,11 @@
+---
+## FIPS Support defaults to False
+fips_support_enabled: false
+fips_remove_openjdk_packages:
+  - "java-11-openjdk"
+  - "java-11-openjdk-headless"
+  - "java-11-openjdk-devel"
+  - "java-11-openjdk-jmods"
+  - "java-11-openjdk-static-libs"
+  - "jre-11-openjdk"
+  - "jre-11-openjdk-headless"

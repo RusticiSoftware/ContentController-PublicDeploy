@@ -1,0 +1,13 @@
+---
+
+  # handlers
+  - name: restart syslog
+    service: name=rsyslog state=restarted
+
+  - name: restart ssh
+    service: name=ssh state=restarted
+    when: ansible_distribution == 'Ubuntu'
+
+  - name: restart sshd
+    service: name=sshd state=restarted
+    when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'

@@ -1,0 +1,13 @@
+<div class="hint-block {{ .Get 0 }}">
+    <div class="hint-title">
+        {{ if eq (.Get 0) "danger" }}🚨
+        {{ else if eq (.Get 0) "warning" }}⚠️
+        {{ else if eq (.Get 0) "tip" }}💡
+        {{ else if eq (.Get 0) "success" }}✅
+        {{ else }}ℹ️
+        {{ end }}
+    </div>
+    <div class="hint-content">
+        {{ .Inner | markdownify }}
+    </div>
+</div>

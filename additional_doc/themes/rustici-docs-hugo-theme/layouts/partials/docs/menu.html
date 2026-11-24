@@ -1,0 +1,44 @@
+{{ partial "docs/brand" . }}
+<nav role="navigation" id="left-nav">
+  <ul>
+    {{ $currentPage := . }}
+    {{ range .Site.Menus.main }}
+        {{ if .HasChildren }}
+            <li class="{{ if $currentPage.HasMenuCurrent "main" . }}active{{ end }}" style="cursor: pointer;">
+                <a onclick="toggleChildren({{ .Identifier }})">
+                    {{ .Pre }}
+                    <span>{{ .Name }}</span>
+                </a>
+            </li>
+            <ul id="{{ .Identifier }}" class="sub-menu {{ if not ($currentPage.HasMenuCurrent "main" .) }}hidden{{ end }}">
+                {{ range .Children }}
+                    <li class="{{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}">
+                        <a href="{{ .URL }}">{{ .Name }}</a>
+                    </li>
+                {{ end }}
+            </ul>
+        {{ else }}
+            {{ if and (ne .Name "Docs") (ne .Name "Introduction") }}
+                <li class="{{ if $currentPage.HasMenuCurrent "main" . }}active{{ end }}">
+                    <a href="{{ .URL }}" {{if eq .Page nil }} target="_blank" rel="noopener noreferrer"{{ end }} >
+                        {{ .Pre }}
+                        <span>{{ .Name }}</span>
+                    </a>
+                </li>
+            {{ end }}
+        {{ end }}
+    {{ end }}
+  </ul>
+</nav>
+
+<script>
+    function toggleChildren(className) {
+        console.log(className);
+        var children = document.getElementById(className);
+        children.classList.toggle('hidden');
+    }
+</script>
+
+{{ if .Site.Params.RememberSidebarPos }}
+  {{ template "jsmenu" . }}
+{{ end }}
