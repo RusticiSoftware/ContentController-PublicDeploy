@@ -1,0 +1,72 @@
+# Rebuilds and deploys all docs (including the API docs) under docs.contentcontroller.com.
+# Blank inputs use the latest Content Controller release and the matching docs commit.
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "CC tag (e.g `v5.0.82`. Automatically picks the latest repository release if blank)"
+        required: false
+        type: string
+      api_ref:
+        description: "CC commit SHA for API docs (automatically picks tag commit if blank)"
+        required: false
+        type: string
+      hugo_ref:
+        description: "cc-deployment-public commit SHA for Hugo docs (automatically picks tag commit if blank)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: self-hosted
+    outputs:
+      api_ref: ${{ steps.resolve.outputs.api_ref }}
+      api_sha_short: ${{ steps.resolve.outputs.api_sha_short }}
+      api_url: ${{ steps.resolve.outputs.api_url }}
+      hugo_sha: ${{ steps.resolve.outputs.hugo_sha }}
+      hugo_sha_short: ${{ steps.resolve.outputs.hugo_sha_short }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      hugo_url: ${{ steps.resolve.outputs.hugo_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout Content Controller
+        uses: actions/checkout@v4
+        with:
+          repository: RusticiSoftware/ContentController
+          path: ContentController
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+
+      - name: Resolve docs refs
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+          TAG_INPUT: ${{ inputs.tag }}
+          API_REF_INPUT: ${{ inputs.api_ref }}
+          HUGO_REF_INPUT: ${{ inputs.hugo_ref }}
+          CC_REPO: ${{ github.workspace }}/ContentController
+          PUBLIC_REPO: ${{ github.workspace }}
+          PUBLIC_REPO_SLUG: ${{ github.repository }}
+        run: python3 .github/scripts/deploy-docs.py resolve
+
+  deploy:
+    name: Deploy ${{ needs.resolve.outputs.tag }} / ${{ needs.resolve.outputs.hugo_sha_short }}
+    needs: resolve
+    uses: ./.github/workflows/deploy-docs-build.yml
+    with:
+      api_ref: ${{ needs.resolve.outputs.api_ref }}
+      hugo_ref: ${{ needs.resolve.outputs.hugo_sha }}
+    secrets:
+      RUSTICI_SYSTEMS_TOKEN: ${{ secrets.RUSTICI_SYSTEMS_TOKEN }}
+      DEPLOY_DOCS_BUCKET: ${{ secrets.DEPLOY_DOCS_BUCKET }}

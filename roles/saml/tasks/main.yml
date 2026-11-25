@@ -1,0 +1,14 @@
+---
+- name: Deploy SAML files
+  copy:
+      src: "{{ item.name }}"
+      dest: "{{ item.dest }}/{{ item.name }}"
+      owner: tomcat
+      group: tomcat
+      mode: 0640
+  with_items:
+    - {name: "samlKeystore.jks", dest: "{{ cc_deploy_path }}"}
+    - {name: "idp-metadata.xml", dest: "{{ cc_deploy_path }}"}
+    # These items are to support version of CC from before we moved the SAML files into cc_deploy_path
+    - {name: "samlKeystore.jks", dest: "{{ data_root }}"}
+    - {name: "idp-metadata.xml", dest: "{{ data_root }}"}

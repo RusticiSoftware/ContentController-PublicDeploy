@@ -1,0 +1,14 @@
+# This is an example inventory file.  If you're setting up servers once and deployment to them every time,
+# you can use the inventory file to avoid needing to specify every server at the command line.
+#
+# To use, copy this file with a new name (such as inventory.prod or inventory.stg), then when running your
+# playbooks, add it from the command line:
+#    ansible-playbook -i inventory.prod ....
+#
+# For more information, see http://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html
+
+[contentcontroller]
+10.1.1.1
+10.1.1.2
+10.1.1.3
+

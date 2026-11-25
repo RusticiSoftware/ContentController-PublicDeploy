@@ -1,0 +1,13 @@
+---
+    - name: "Check if {{item.file}} customization exists"
+      stat:
+        path: "{{item.src_dir}}{{item.file}}"
+      register: customization_exists
+
+    - name: "Deploy {{item.file}} customization if needed"
+      when: customization_exists.stat.exists
+      copy:
+        src: "{{item.src_dir}}{{item.file}}"
+        dest: "{{ item.dest }}"
+        remote_src: yes
+        mode: 0644

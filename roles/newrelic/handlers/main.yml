@@ -1,0 +1,7 @@
+---
+
+  - name: restart newrelic-plugin-agent
+    service: name=newrelic-plugin-agent state=restarted
+
+  - name: restart newrelic-sysmond
+    service: name=newrelic-sysmond state=restarted

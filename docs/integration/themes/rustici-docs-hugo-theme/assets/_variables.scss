@@ -1,0 +1,48 @@
+// Padding Helpers
+$padding-1: 1px;
+$padding-4: 0.25rem;
+$padding-8: 0.5rem;
+$padding-16: 1rem;
+
+// Font Sizes
+$font-size-base: 16px;
+$font-size-12: 0.75rem;
+$font-size-14: 0.875rem;
+$font-size-16: 1rem;
+
+// Common Colors
+$white: #ffffff;
+
+
+$sidebar-background: #ecf0f2;
+$sidebar-width: 375px;
+
+// Grayscale
+$gray-100: #f8f9fa;
+$gray-200: #e9ecef;
+$gray-300: #dee2e6;
+$gray-400: #ced4da;
+$gray-500: #adb5bd;
+$gray-600: #868e96;
+$gray-700: #495057;
+$gray-800: #343a40;
+$gray-900: #212529;
+$black: #000;
+
+// Link Colors
+$color-link: #004ed0;
+$color-visited-link: #8440f1;
+$color-dark-link: $gray-800;
+
+$body-background: white;
+$body-font-color: $gray-800;
+$body-font-weight: 400;
+
+// Body Size
+// $body-min-width: 900px;
+$docs-max-width: 900px;
+$toc-min-width: 300px;
+
+// Responsive Breakpoints
+$sm-breakpoint: 768px;
+$md-breakpoint: $sidebar-width + 900px + $toc-min-width;

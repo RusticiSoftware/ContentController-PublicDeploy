@@ -1,0 +1,8 @@
+---
+
+  - name: Upload certificate to AWS IAM object
+    shell: aws iam upload-server-certificate --server-certificate-name star_cloud_scorm_com --certificate-body file://star_cloud_scorm_com.crt --private-key file://star_cloud_scorm_com.key --certificate-chain file://gd_bundle-g2-g1.crt
+    register: sslupload
+
+  - name: Show results of upload-server-certificate
+    debug: msg="{{ sslupload['ServerCertificateMetadata'] }}"
